@@ -1,0 +1,13 @@
+---
+description: Always commit and push changes after making edits
+alwaysApply: true
+---
+
+# Push changes after edits
+
+After making any code or config changes in this project:
+
+1. **Stage and commit** all modified/added files with a clear, short commit message.
+2. **Push** to the remote (e.g. `git push`).
+
+Use PowerShell-compatible commands in this repo (e.g. `;` instead of `&&` for chaining). If the repo has no remote or push fails due to auth, tell the user what was committed and that they need to push manually.
