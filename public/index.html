@@ -182,11 +182,8 @@
 
   <div id="pageDashboard" class="page active">
     <div class="section">
-      <div class="row" style="align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-        <label for="guild" style="margin-top: 0;">Server</label>
-        <button type="button" id="loadServersBtn">Load servers</button>
-      </div>
-      <select id="guild"><option value="">Click Load servers</option></select>
+      <label for="guild" style="margin-top: 0;">Server</label>
+      <select id="guild"><option value="">Choose server</option></select>
       <label for="channel">Channel</label>
       <select id="channel"><option value="">Select a server first</option></select>
       <label for="content">Message</label>
@@ -205,7 +202,7 @@
       <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Schedule recurring message</h2>
       <p class="muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">Add one or more messages: each time the schedule runs, one will be picked at random.</p>
       <label for="scheduleGuild">Server</label>
-      <select id="scheduleGuild"><option value="">Load servers on Dashboard first</option></select>
+      <select id="scheduleGuild"><option value="">Choose server</option></select>
       <label for="scheduleChannel">Channel</label>
       <select id="scheduleChannel"><option value="">Select a server first</option></select>
       <p class="muted" style="font-size: 0.8rem; margin-bottom: 0.25rem;">Use plain text messages and/or saved messages (one picked at random each time).</p>
@@ -614,13 +611,9 @@
       if (g) g.channels.forEach(c => { channelEl.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`; });
     });
 
-    const loadServersBtn = document.getElementById("loadServersBtn");
-
     async function loadChannelsAndCache() {
-      loadServersBtn.disabled = true;
       const r = await fetch("/api/channels", fetchOpts({ headers: headers() }));
       const data = await r.json().catch(() => ({}));
-      loadServersBtn.disabled = false;
       if (!r.ok) {
         guildEl.innerHTML = "<option value=''>" + (data.error || "Load failed") + "</option>";
         return;
@@ -821,8 +814,6 @@
         });
       });
     })();
-
-    loadServersBtn.addEventListener("click", () => loadChannelsAndCache());
 
     async function loadDeletedLogConfig() {
       const listEl = document.getElementById("deletedLogChannelsList");
