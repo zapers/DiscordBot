@@ -4,11 +4,16 @@ import { createApi } from "./api.js";
 import { initScheduler, addSchedule, listSchedules, removeSchedule } from "./scheduler.js";
 import { buildMessagePayload, hasMessageContent } from "./embedBuilder.js";
 import { save as saveMessage, get as getSavedMessage, list as listSavedMessages, remove as removeSavedMessage } from "./savedMessages.js";
+import { getLogChannelForGuild } from "./deletedLogConfig.js";
 
 config();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // Required for deleted-message logging (content in cache)
+  ],
 });
 
 // Shared message options for rich embeds (embed-generator style)
@@ -155,6 +160,26 @@ client.once("clientReady", async () => {
   api.listen(port, "0.0.0.0", () => {
     console.log(`Web app: http://localhost:${port}`);
   });
+});
+
+client.on("messageDelete", async (message) => {
+  const guildId = message.guildId ?? message.guild?.id;
+  if (!guildId) return;
+  const logChannelId = getLogChannelForGuild(guildId);
+  if (!logChannelId) return;
+  try {
+    const logChannel = await client.channels.fetch(logChannelId).catch(() => null);
+    if (!logChannel?.isTextBased()) return;
+    const channelName = message.channel?.name ?? "unknown";
+    const author = message.author ? `${message.author.tag} (${message.author.id})` : "unknown user";
+    const content = message.content?.trim() || "(no text / message not cached)";
+    const preview = content.length > 400 ? content.slice(0, 400) + "…" : content;
+    await logChannel.send({
+      content: `**Message deleted** in #${channelName}\n**Author:** ${author}\n**Content:**\n${preview}`,
+    });
+  } catch (e) {
+    console.error("Deleted-message log failed:", e);
+  }
 });
 
 client.on("interactionCreate", async (interaction) => {

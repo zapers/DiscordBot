@@ -71,6 +71,20 @@
     <ul id="botServersList"></ul>
   </div>
 
+  <div id="deletedLogSection" class="section" style="display: none;">
+    <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Deleted message logging</h2>
+    <p class="muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">When a message is deleted anywhere in the selected server, the bot will post a log to the channel below.</p>
+    <label for="deletedLogGuild">Server to monitor</label>
+    <select id="deletedLogGuild"><option value="">Load servers first</option></select>
+    <label for="deletedLogChannel">Channel where bot sends logs</label>
+    <select id="deletedLogChannel"><option value="">Select a server first</option></select>
+    <div class="row" style="margin-top: 0.5rem; gap: 0.5rem;">
+      <button type="button" id="deletedLogSaveBtn">Save</button>
+      <button type="button" id="deletedLogClearBtn" class="btn-secondary">Stop logging for this server</button>
+    </div>
+    <p id="deletedLogStatus" class="muted" style="font-size: 0.875rem; margin-top: 0.25rem;"></p>
+  </div>
+
   <div class="section">
     <div class="row" style="align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
       <label for="guild" style="margin-top: 0;">Server</label>
@@ -200,10 +214,12 @@
       if (window._isAdmin) {
         document.getElementById("adminBadge").style.display = "inline";
         document.getElementById("botServersSection").style.display = "block";
+        document.getElementById("deletedLogSection").style.display = "block";
         loadBotServers();
       } else {
         document.getElementById("adminBadge").style.display = "none";
         document.getElementById("botServersSection").style.display = "none";
+        document.getElementById("deletedLogSection").style.display = "none";
       }
       loadChannelsAndCache();
     }
@@ -336,10 +352,79 @@
       }
       window._guildsCache = data;
       guildEl.innerHTML = "<option value=''>Choose server</option>" + data.guilds.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
+      if (window._isAdmin) {
+        const dlg = document.getElementById("deletedLogGuild");
+        dlg.innerHTML = "<option value=''>Choose server</option>" + data.guilds.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
+        loadDeletedLogConfig();
+      }
       loadSchedules();
     }
 
     loadServersBtn.addEventListener("click", () => loadChannelsAndCache());
+
+    document.getElementById("deletedLogGuild").addEventListener("change", () => {
+      const guildId = document.getElementById("deletedLogGuild").value;
+      const chEl = document.getElementById("deletedLogChannel");
+      chEl.innerHTML = "<option value=''>Choose channel</option>";
+      if (!guildId || !window._guildsCache) return;
+      const g = window._guildsCache.guilds.find(x => x.id === guildId);
+      if (g) g.channels.forEach(c => { chEl.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`; });
+    });
+
+    async function loadDeletedLogConfig() {
+      const r = await fetch("/api/deleted-log-config", fetchOpts({ headers: headers() }));
+      if (!r.ok) return;
+      const { guilds } = await r.json().catch(() => ({})) || {};
+      const cfg = guilds || {};
+      const guildId = Object.keys(cfg)[0];
+      if (guildId && window._guildsCache) {
+        document.getElementById("deletedLogGuild").value = guildId;
+        document.getElementById("deletedLogGuild").dispatchEvent(new Event("change"));
+        const channelId = cfg[guildId];
+        if (channelId) setTimeout(() => { document.getElementById("deletedLogChannel").value = channelId; }, 0);
+        document.getElementById("deletedLogStatus").textContent = "Currently logging deletions to the selected channel.";
+      }
+    }
+
+    document.getElementById("deletedLogSaveBtn").addEventListener("click", async () => {
+      const guildId = document.getElementById("deletedLogGuild").value;
+      const channelId = document.getElementById("deletedLogChannel").value;
+      const statusEl = document.getElementById("deletedLogStatus");
+      if (!guildId || !channelId) {
+        statusEl.textContent = "Select a server and a channel.";
+        statusEl.className = "error";
+        return;
+      }
+      const r = await fetch("/api/deleted-log-config", fetchOpts({ method: "PUT", headers: headers(), body: JSON.stringify({ guildId, channelId }) }));
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        statusEl.textContent = "Saved. Deleted messages in this server will be logged to the selected channel.";
+        statusEl.className = "success";
+      } else {
+        statusEl.textContent = data.error || "Failed to save.";
+        statusEl.className = "error";
+      }
+    });
+
+    document.getElementById("deletedLogClearBtn").addEventListener("click", async () => {
+      const guildId = document.getElementById("deletedLogGuild").value;
+      const statusEl = document.getElementById("deletedLogStatus");
+      if (!guildId) {
+        statusEl.textContent = "Select a server first.";
+        statusEl.className = "error";
+        return;
+      }
+      const r = await fetch("/api/deleted-log-config", fetchOpts({ method: "PUT", headers: headers(), body: JSON.stringify({ guildId, channelId: null }) }));
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        statusEl.textContent = "Stopped logging for this server.";
+        statusEl.className = "success";
+        document.getElementById("deletedLogChannel").value = "";
+      } else {
+        statusEl.textContent = data.error || "Failed.";
+        statusEl.className = "error";
+      }
+    });
 
     function escapeHtml(s) {
       const div = document.createElement("div");

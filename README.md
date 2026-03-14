@@ -37,6 +37,8 @@ From the web UI you can: pick server & channel, type a message, **Send now**, or
    - `Send Messages`
    - `Embed Links`
 
+   If you use **deleted message logging** (web app → Deleted message logging): in the Developer Portal → your app → **Bot** → enable **Message Content Intent** so the bot can log message content when messages are deleted.
+
 3. **Configure**:
    ```bash
    cp .env.example .env
