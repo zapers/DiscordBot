@@ -28,16 +28,17 @@ In your Railway project: **Your Service** → **Variables** → **Add Variable**
 | Variable        | Value                    | Required |
 |----------------|--------------------------|----------|
 | `DISCORD_TOKEN`| Your bot token from the [Discord Developer Portal](https://discord.com/developers/applications) → Bot → Reset/Copy | **Yes** |
-| `API_KEY`      | A secret string (e.g. a long random password)        | **Yes** (see below) |
+| `ADMIN_PASSWORD`  | The password you use to log into the web app        | **Yes** |
+| `API_KEY`         | Optional: for script/programmatic API access        | No |
 | `GUILD_ID`     | Your Discord server ID (optional; makes slash commands show up in ~1 min instead of up to 1 hour) | No |
 
-- **Why `API_KEY` is required on Railway:** The app is reachable on the internet. If `API_KEY` is not set, the web app and API only accept requests from localhost, so the hosted site would be unusable. Set `API_KEY` and then enter that same value in the “API key” field on the web app so your browser can call the API.
+- **Admin login:** The app is reachable on the internet. If `API_KEY` is not set, the web app and API only accept requests from localhost, so the hosted site would be unusable. Set `API_KEY` and then enter that same value in the “API key” field on the web app so your browser can call the API.
 
 ## 4. Get your app URL
 
 1. In Railway, open your service → **Settings** → **Networking**.
 2. Click **Generate Domain**. Railway will assign a URL like `your-app.up.railway.app`.
-3. Open that URL in your browser. You should see the Discord Scheduler web app. Enter your `API_KEY` in the field at the top and use the app as usual.
+3. Open that URL in your browser. Log in with your `ADMIN_PASSWORD` to use the scheduler and view all scheduled messages.
 
 ## 5. (Optional) Persistent data
 
