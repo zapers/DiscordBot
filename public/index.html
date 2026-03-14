@@ -25,9 +25,8 @@
     li { padding: 0.5rem; background: #f5f5f5; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
     .schedule-preview { font-size: 0.875rem; color: #666; }
     .schedule-where { display: block; font-size: 0.8rem; color: #5865f2; margin-top: 0.15rem; }
-    #apiKeyWrap { margin-bottom: 1rem; }
-    #apiKeyWrap input { max-width: 280px; }
     .muted { color: #666; font-size: 0.875rem; }
+    .next-run { font-size: 0.8rem; color: #57f287; margin-top: 0.15rem; }
     .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-left: 0.25rem; }
     .btn-secondary { background: #4f545c; color: #fff; }
     .btn-secondary:hover { background: #686d73; }
@@ -59,16 +58,12 @@
     <ul id="botServersList"></ul>
   </div>
 
-  <div id="apiKeyWrap" class="section">
-    <label for="apiKey">API key (optional – for script access)</label>
-    <input type="password" id="apiKey" placeholder="Same as API_KEY in Railway if set">
-    <button type="button" id="loadServersBtn" style="margin-top: 0.5rem;">Load servers</button>
-    <div id="serverLoadStatus" class="muted" style="margin-top: 0.25rem;"></div>
-  </div>
-
   <div class="section">
-    <label for="guild">Server</label>
-    <select id="guild"><option value="">Enter API key and click Load servers</option></select>
+    <div class="row" style="align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+      <label for="guild" style="margin-top: 0;">Server</label>
+      <button type="button" id="loadServersBtn">Load servers</button>
+    </div>
+    <select id="guild"><option value="">Click Load servers</option></select>
     <label for="channel">Channel</label>
     <select id="channel"><option value="">Select a server first</option></select>
     <label for="content">Message</label>
@@ -149,7 +144,6 @@
   </div>
 
   <script>
-    const apiKeyEl = document.getElementById("apiKey");
     const guildEl = document.getElementById("guild");
     const channelEl = document.getElementById("channel");
     const contentEl = document.getElementById("content");
@@ -176,10 +170,7 @@
 
     const fetchOpts = (opts = {}) => ({ ...opts, credentials: "include" });
     function headers() {
-      const h = { "Content-Type": "application/json" };
-      const key = apiKeyEl.value.trim();
-      if (key) h["X-API-Key"] = key;
-      return h;
+      return { "Content-Type": "application/json" };
     }
 
     async function checkAuth() {
@@ -201,6 +192,7 @@
         document.getElementById("adminBadge").style.display = "none";
         document.getElementById("botServersSection").style.display = "none";
       }
+      loadChannelsAndCache();
     }
 
     async function loadBotServers() {
@@ -318,25 +310,17 @@
       if (g) g.channels.forEach(c => { channelEl.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`; });
     });
 
-    const serverLoadStatus = document.getElementById("serverLoadStatus");
     const loadServersBtn = document.getElementById("loadServersBtn");
 
-    try { apiKeyEl.value = localStorage.getItem("discord_scheduler_api_key") || ""; } catch (e) {}
-    apiKeyEl.addEventListener("input", () => { try { localStorage.setItem("discord_scheduler_api_key", apiKeyEl.value); } catch (e) {} });
-    apiKeyEl.addEventListener("blur", () => { try { localStorage.setItem("discord_scheduler_api_key", apiKeyEl.value); } catch (e) {} });
-
     async function loadChannelsAndCache() {
-      serverLoadStatus.textContent = "Loading…";
+      loadServersBtn.disabled = true;
       const r = await fetch("/api/channels", fetchOpts({ headers: headers() }));
       const data = await r.json().catch(() => ({}));
+      loadServersBtn.disabled = false;
       if (!r.ok) {
-        serverLoadStatus.textContent = data.error || "Failed to load. Check your API key.";
-        serverLoadStatus.style.color = "#ed4245";
         guildEl.innerHTML = "<option value=''>" + (data.error || "Load failed") + "</option>";
         return;
       }
-      serverLoadStatus.textContent = "";
-      serverLoadStatus.style.color = "";
       window._guildsCache = data;
       guildEl.innerHTML = "<option value=''>Choose server</option>" + data.guilds.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
       loadSchedules();
@@ -397,6 +381,35 @@
       } else show(scheduleStatus, data.error || "Failed", true);
     });
 
+    function formatNextRun(nextRunAt) {
+      if (!nextRunAt) return "";
+      const d = new Date(nextRunAt);
+      const t = d.toISOString().slice(11, 19);
+      const dateStr = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined });
+      return dateStr + " " + t + " UTC";
+    }
+    function updateNextRunCountdowns() {
+      scheduleList.querySelectorAll("[data-next-run]").forEach(el => {
+        const iso = el.dataset.nextRun;
+        if (!iso) return;
+        const diff = new Date(iso) - new Date();
+        if (diff <= 0) {
+          el.textContent = "Sending…";
+          return;
+        }
+        const s = Math.floor(diff / 1000) % 60;
+        const m = Math.floor(diff / 60000) % 60;
+        const h = Math.floor(diff / 3600000) % 24;
+        const d = Math.floor(diff / 86400000);
+        const parts = [];
+        if (d) parts.push(d + "d");
+        if (h) parts.push(h + "h");
+        parts.push(m + "m");
+        parts.push(s + "s");
+        el.textContent = "Next: " + el.dataset.nextRunFormatted + " (in " + parts.join(" ") + ")";
+      });
+    }
+
     async function loadSchedules() {
       const r = await fetch("/api/schedules", fetchOpts({ headers: headers() }));
       if (!r.ok) { scheduleList.innerHTML = "<li>Could not load schedules</li>"; return; }
@@ -405,12 +418,16 @@
       scheduleList.innerHTML = schedules.map(s => {
         const where = [s.serverName, s.channelName ? "#" + s.channelName : ""].filter(Boolean).join(" › ") || "Unknown channel";
         const pausedBadge = s.paused ? ' <span class="muted" style="font-weight: normal;">(Paused)</span>' : "";
+        const nextRunHtml = s.nextRunAt
+          ? `<span class="next-run" data-next-run="${escapeHtml(s.nextRunAt)}" data-next-run-formatted="${escapeHtml(formatNextRun(s.nextRunAt))}"></span>`
+          : s.paused ? '<span class="next-run muted">Paused</span>' : "";
         return `
         <li>
           <span>
             <strong>${escapeHtml(s.label)}</strong>${pausedBadge}
             <span class="schedule-where">${escapeHtml(where)}</span>
             <span class="schedule-preview">${escapeHtml(s.preview || "")}</span>
+            ${nextRunHtml}
           </span>
           <span>
             ${s.paused ? `<button class="btn-sm" data-action="resume" data-id="${escapeHtml(s.id)}">Resume</button>` : `<button class="btn-sm btn-secondary" data-action="pause" data-id="${escapeHtml(s.id)}">Pause</button>`}
@@ -420,6 +437,9 @@
         </li>
       `;
       }).join("");
+      updateNextRunCountdowns();
+      if (window._nextRunInterval) clearInterval(window._nextRunInterval);
+      window._nextRunInterval = setInterval(updateNextRunCountdowns, 1000);
       scheduleList.querySelectorAll("button").forEach(btn => {
         btn.addEventListener("click", async () => {
           const id = btn.dataset.id;
@@ -485,8 +505,6 @@
       const ok = await checkAuth();
       if (ok) {
         showApp();
-        serverLoadStatus.textContent = "Click Load servers to refresh.";
-        await loadSchedules();
       } else {
         showLogin();
       }

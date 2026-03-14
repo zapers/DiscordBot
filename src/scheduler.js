@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import cronParser from "cron-parser";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { getDataDir } from "./dataDir.js";
@@ -161,6 +162,25 @@ export function removeSchedule(id) {
   stopJob(id);
   saveSchedules(schedules.filter((s) => s.id !== id));
   return true;
+}
+
+/**
+ * Get the next run time for a schedule (accurate to the second), or null if paused.
+ * @param {object} schedule - Full schedule object with cron, timezone, paused
+ * @returns {string|null} ISO date string of next run, or null
+ */
+export function getNextRun(schedule) {
+  if (schedule.paused) return null;
+  try {
+    const interval = cronParser.parse(schedule.cron, {
+      currentDate: new Date(),
+      tz: schedule.timezone || "UTC",
+    });
+    const next = interval.next();
+    return next.toDate().toISOString();
+  } catch (e) {
+    return null;
+  }
 }
 
 /**

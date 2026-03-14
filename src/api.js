@@ -2,7 +2,7 @@ import express from "express";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { randomBytes } from "crypto";
-import { addSchedule, listSchedules, removeSchedule, getScheduleById, setSchedulePaused, updateSchedule } from "./scheduler.js";
+import { addSchedule, listSchedules, removeSchedule, getScheduleById, setSchedulePaused, updateSchedule, getNextRun } from "./scheduler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -269,7 +269,9 @@ export function createApi(client) {
               serverName = ch.guild?.name || "";
             }
           } catch (_) {}
-          return { ...s, serverName, channelName };
+          const full = getScheduleById(s.id);
+          const nextRunAt = full ? getNextRun(full) : null;
+          return { ...s, serverName, channelName, nextRunAt };
         })
       );
       res.json({ schedules: enriched });
