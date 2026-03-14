@@ -1,0 +1,25 @@
+{
+  "name": "discord-custom-message-bot",
+  "version": "1.0.0",
+  "description": "Discord bot to send customizable messages to a channel",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/register-commands.js"
+  },
+  "keywords": [
+    "discord",
+    "bot"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "node-cron": "^4.2.1"
+  }
+}
