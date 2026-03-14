@@ -130,7 +130,7 @@ const messageCommand = {
   ],
 };
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
   const guildId =
@@ -352,5 +352,10 @@ if (!token) {
   console.error("Missing DISCORD_TOKEN in .env");
   process.exit(1);
 }
+
+process.on("SIGTERM", () => {
+  client.destroy();
+  process.exit(0);
+});
 
 client.login(token);
