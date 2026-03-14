@@ -1,5 +1,7 @@
 import { Client, GatewayIntentBits, REST, Routes } from "discord.js";
 import { config } from "dotenv";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 import { createApi } from "./api.js";
 import { initScheduler, addSchedule, listSchedules, removeSchedule } from "./scheduler.js";
 import { buildMessagePayload, hasMessageContent } from "./embedBuilder.js";
@@ -9,6 +11,16 @@ import { list as listCustomCommands, get as getCustomCommand, getPrefix as getCu
 import { getDataDir } from "./dataDir.js";
 
 config();
+
+/** Ensure data directory and default config files exist so custom commands and deleted-log config persist. */
+function ensureDataStorage() {
+  const dir = getDataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const customCommandsPath = join(dir, "custom-commands.json");
+  const deletedLogPath = join(dir, "deleted-log-config.json");
+  if (!existsSync(customCommandsPath)) writeFileSync(customCommandsPath, "[]", "utf8");
+  if (!existsSync(deletedLogPath)) writeFileSync(deletedLogPath, JSON.stringify({ channels: [] }, null, 2), "utf8");
+}
 
 const client = new Client({
   intents: [
@@ -167,6 +179,7 @@ client.once("clientReady", async () => {
   } catch (e) {
     console.error("Failed to register slash commands:", e);
   }
+  ensureDataStorage();
   const dataDir = getDataDir();
   const customCount = listCustomCommands().length;
   const logChannelCount = getAllLogChannels().length;
@@ -233,7 +246,16 @@ client.on("messageDelete", async (message) => {
   if (!guildId) return;
   const logChannelIds = getLogChannelIdsForGuild(guildId);
   if (logChannelIds.length === 0) return;
-  const channelName = message.channel?.name ?? "unknown";
+  let channelName = message.channel?.name;
+  if (channelName == null && message.channelId) {
+    try {
+      const ch = await client.channels.fetch(message.channelId).catch(() => null);
+      channelName = ch?.name ?? "unknown";
+    } catch (_) {
+      channelName = "unknown";
+    }
+  }
+  channelName = channelName ?? "unknown";
   const author = message.author ? `${message.author.tag} (${message.author.id})` : "unknown user";
   const content = message.content?.trim() || "(no text / message not cached)";
   const preview = content.length > 400 ? content.slice(0, 400) + "…" : content;
@@ -259,15 +281,23 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.reply({ content: "This command must be used in a server channel.", ephemeral: true });
     }
     if (sub === "here") {
-      addLogChannel(channel.id, guildId);
-      return interaction.reply({
+      try {
+        addLogChannel(channel.id, guildId);
+        return interaction.reply({
         content: "Deleted message logs will be sent to this channel. The bot monitors every server it’s in; logs for this server will appear here.",
         ephemeral: false,
       });
+      } catch (e) {
+        return interaction.reply({ content: "Failed to save. The bot may not have write access to its data directory.", ephemeral: true });
+      }
     }
     if (sub === "off") {
-      removeLogChannel(channel.id);
-      return interaction.reply({ content: "Stopped sending deleted message logs to this channel.", ephemeral: false });
+      try {
+        removeLogChannel(channel.id);
+        return interaction.reply({ content: "Stopped sending deleted message logs to this channel.", ephemeral: false });
+      } catch (e) {
+        return interaction.reply({ content: "Failed to save.", ephemeral: true });
+      }
     }
     return;
   }
