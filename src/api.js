@@ -3,6 +3,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { randomBytes } from "crypto";
 import { addSchedule, listSchedules, removeSchedule, getScheduleById, setSchedulePaused, updateSchedule, getNextRun } from "./scheduler.js";
+import { getConfig as getDeletedLogConfig, setLogChannel as setDeletedLogChannel } from "./deletedLogConfig.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -177,6 +178,29 @@ export function createApi(client) {
         memberCount: g.memberCount ?? 0,
       }));
       res.json({ servers });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /** Get deleted-message log config: which guilds are monitored and where logs are sent */
+  app.get("/api/deleted-log-config", (req, res) => {
+    try {
+      const config = getDeletedLogConfig();
+      res.json(config.guilds ? { guilds: config.guilds } : { guilds: {} });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /** Set or clear the log channel for a server (admin only). Body: { guildId, channelId }. Pass channelId null to disable. */
+  app.put("/api/deleted-log-config", (req, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ error: "Admin only" });
+    const { guildId, channelId } = req.body || {};
+    if (!guildId) return res.status(400).json({ error: "guildId required" });
+    try {
+      setDeletedLogChannel(String(guildId), channelId ? String(channelId) : null);
+      res.json({ ok: true, guildId: String(guildId), channelId: channelId ? String(channelId) : null });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
