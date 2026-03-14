@@ -21,13 +21,9 @@ function loadAll() {
 }
 
 function saveAll(commands) {
-  try {
-    const dir = getDataDir();
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(getStorePath(), JSON.stringify(commands, null, 2), "utf8");
-  } catch (e) {
-    console.error("Failed to save custom commands:", e);
-  }
+  const dir = getDataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(getStorePath(), JSON.stringify(commands, null, 2), "utf8");
 }
 
 /** Command name must be one word, alphanumeric (and maybe hyphen/underscore). */

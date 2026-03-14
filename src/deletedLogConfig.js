@@ -28,13 +28,9 @@ function load() {
 }
 
 function save(config) {
-  try {
-    const dir = getDataDir();
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), "utf8");
-  } catch (e) {
-    console.error("Failed to save deleted-log config:", e);
-  }
+  const dir = getDataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(getConfigPath(), JSON.stringify(config, null, 2), "utf8");
 }
 
 /**
