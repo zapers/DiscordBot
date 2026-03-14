@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Scheduler</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 0 auto; padding: 1rem; }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+    label { display: block; margin-top: 0.75rem; font-weight: 500; }
+    select, textarea, input[type="text"], input[type="number"] { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { margin-top: 0.75rem; padding: 0.5rem 1rem; cursor: pointer; background: #5865f2; color: #fff; border: none; border-radius: 4px; }
+    button:hover { background: #4752c4; }
+    button.danger { background: #ed4245; }
+    button.danger:hover { background: #c03537; }
+    .section { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #ddd; }
+    .section:last-of-type { border-bottom: none; }
+    .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .row label { margin-top: 0; }
+    .error { color: #ed4245; margin-top: 0.5rem; }
+    .success { color: #57f287; margin-top: 0.5rem; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { padding: 0.5rem; background: #f5f5f5; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .schedule-preview { font-size: 0.875rem; color: #666; }
+    #apiKeyWrap { margin-bottom: 1rem; }
+    #apiKeyWrap input { max-width: 240px; }
+  </style>
+</head>
+<body>
+  <h1>Discord Scheduler</h1>
+  <p>Send or schedule plain text messages to a channel. Bot must be in the server.</p>
+
+  <div id="apiKeyWrap" class="section">
+    <label for="apiKey">API key (optional for localhost)</label>
+    <input type="password" id="apiKey" placeholder="Leave empty if running locally">
+  </div>
+
+  <div class="section">
+    <label for="guild">Server</label>
+    <select id="guild"><option value="">Loading…</option></select>
+    <label for="channel">Channel</label>
+    <select id="channel"><option value="">Select a server first</option></select>
+    <label for="content">Message</label>
+    <textarea id="content" placeholder="Your message text"></textarea>
+    <button id="sendBtn">Send now</button>
+    <div id="sendStatus"></div>
+  </div>
+
+  <div class="section">
+    <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Schedule recurring message</h2>
+    <label for="scheduleType">Repeat</label>
+    <select id="scheduleType">
+      <option value="interval_minutes">Every N minutes</option>
+      <option value="daily">Daily at a time</option>
+      <option value="weekly">Weekly (e.g. every 7 days)</option>
+    </select>
+    <div id="optsInterval" class="row">
+      <label>Minutes <input type="number" id="minutes" value="5" min="1" max="60" style="width: 60px;"></label>
+    </div>
+    <div id="optsDaily" class="row" style="display: none;">
+      <label>Hour <select id="timeHourDaily" style="width: 70px;"></select></label>
+      <label>Minute <select id="timeMinDaily" style="width: 70px;"></select></label>
+      <label>Timezone <select id="timezoneDaily" style="width: 200px;"></select></label>
+    </div>
+    <div id="optsWeekly" class="row" style="display: none;">
+      <label>Day <select id="dayOfWeek" style="width: 120px;">
+        <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+        <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="7">Sunday</option>
+      </select></label>
+      <label>Hour <select id="timeHourWeekly" style="width: 70px;"></select></label>
+      <label>Minute <select id="timeMinWeekly" style="width: 70px;"></select></label>
+      <label>Timezone <select id="timezoneWeekly" style="width: 200px;"></select></label>
+    </div>
+    <button id="scheduleBtn">Create schedule</button>
+    <div id="scheduleStatus"></div>
+  </div>
+
+  <div class="section">
+    <h2 style="font-size: 1rem; margin-bottom: 0.5rem;">Scheduled messages</h2>
+    <ul id="scheduleList"></ul>
+  </div>
+
+  <script>
+    const apiKeyEl = document.getElementById("apiKey");
+    const guildEl = document.getElementById("guild");
+    const channelEl = document.getElementById("channel");
+    const contentEl = document.getElementById("content");
+    const sendBtn = document.getElementById("sendBtn");
+    const sendStatus = document.getElementById("sendStatus");
+    const scheduleTypeEl = document.getElementById("scheduleType");
+    const optsInterval = document.getElementById("optsInterval");
+    const optsDaily = document.getElementById("optsDaily");
+    const optsWeekly = document.getElementById("optsWeekly");
+    const scheduleBtn = document.getElementById("scheduleBtn");
+    const scheduleStatus = document.getElementById("scheduleStatus");
+    const scheduleList = document.getElementById("scheduleList");
+
+    const TIMEZONES = [
+      "UTC", "Europe/Athens", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Rome", "Europe/Moscow",
+      "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+      "Asia/Tokyo", "Asia/Shanghai", "Asia/Kolkata", "Australia/Sydney"
+    ];
+
+    function headers() {
+      const h = { "Content-Type": "application/json" };
+      const key = apiKeyEl.value.trim();
+      if (key) h["X-API-Key"] = key;
+      return h;
+    }
+
+    function show(el, msg, isError) {
+      el.textContent = msg;
+      el.className = isError ? "error" : "success";
+    }
+
+    scheduleTypeEl.addEventListener("change", () => {
+      const v = scheduleTypeEl.value;
+      optsInterval.style.display = v === "interval_minutes" ? "flex" : "none";
+      optsDaily.style.display = v === "daily" ? "flex" : "none";
+      optsWeekly.style.display = v === "weekly" ? "flex" : "none";
+    });
+    scheduleTypeEl.dispatchEvent(new Event("change"));
+
+    async function loadChannels() {
+      const r = await fetch("/api/channels", { headers: headers() });
+      if (!r.ok) {
+        guildEl.innerHTML = "<option value=''>API error: " + (await r.json().catch(() => ({}))).error + "</option>";
+        return;
+      }
+      const { guilds } = await r.json();
+      guildEl.innerHTML = "<option value=''>Choose server</option>" + guilds.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
+    }
+
+    function fillTimeScrollers() {
+      const hourOpts = Array.from({ length: 24 }, (_, i) => `<option value="${i}" ${i === 9 ? "selected" : ""}>${String(i).padStart(2, "0")}</option>`).join("");
+      const minOpts = Array.from({ length: 60 }, (_, i) => `<option value="${i}" ${i === 0 ? "selected" : ""}>${String(i).padStart(2, "0")}</option>`).join("");
+      document.getElementById("timeHourDaily").innerHTML = hourOpts;
+      document.getElementById("timeMinDaily").innerHTML = minOpts;
+      document.getElementById("timeHourWeekly").innerHTML = hourOpts;
+      document.getElementById("timeMinWeekly").innerHTML = minOpts;
+      const tzOpts = TIMEZONES.map(tz => `<option value="${escapeHtml(tz)}" ${tz === "UTC" ? "selected" : ""}>${escapeHtml(tz)}</option>`).join("");
+      document.getElementById("timezoneDaily").innerHTML = tzOpts;
+      document.getElementById("timezoneWeekly").innerHTML = tzOpts;
+    }
+
+    guildEl.addEventListener("change", () => {
+      const id = guildEl.value;
+      channelEl.innerHTML = "<option value=''>Choose channel</option>";
+      if (!id || !window._guildsCache) return;
+      const g = window._guildsCache.guilds.find(x => x.id === id);
+      if (g) g.channels.forEach(c => { channelEl.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`; });
+    });
+
+    async function loadChannelsAndCache() {
+      const r = await fetch("/api/channels", { headers: headers() });
+      if (!r.ok) return;
+      const data = await r.json();
+      window._guildsCache = data;
+      guildEl.innerHTML = "<option value=''>Choose server</option>" + data.guilds.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join("");
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement("div");
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    sendBtn.addEventListener("click", async () => {
+      const channelId = channelEl.value;
+      const content = contentEl.value.trim();
+      if (!channelId || !content) {
+        show(sendStatus, "Pick a channel and enter message.", true);
+        return;
+      }
+      sendBtn.disabled = true;
+      const r = await fetch("/api/send", { method: "POST", headers: headers(), body: JSON.stringify({ channelId, content }) });
+      const data = await r.json().catch(() => ({}));
+      sendBtn.disabled = false;
+      if (r.ok) show(sendStatus, "Sent."); else show(sendStatus, data.error || "Failed", true);
+    });
+
+    scheduleBtn.addEventListener("click", async () => {
+      const channelId = channelEl.value;
+      const content = contentEl.value.trim();
+      const scheduleType = scheduleTypeEl.value;
+      if (!channelId || !content) {
+        show(scheduleStatus, "Pick a channel and enter message.", true);
+        return;
+      }
+      const body = { channelId, content, scheduleType, timezone: "UTC" };
+      if (scheduleType === "interval_minutes") body.minutes = parseInt(document.getElementById("minutes").value, 10) || 5;
+      if (scheduleType === "daily") {
+        const h = document.getElementById("timeHourDaily").value;
+        const m = document.getElementById("timeMinDaily").value;
+        body.time = (String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0"));
+        body.timezone = document.getElementById("timezoneDaily").value || "UTC";
+      }
+      if (scheduleType === "weekly") {
+        body.day_of_week = parseInt(document.getElementById("dayOfWeek").value, 10);
+        const h = document.getElementById("timeHourWeekly").value;
+        const m = document.getElementById("timeMinWeekly").value;
+        body.time = (String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0"));
+        body.timezone = document.getElementById("timezoneWeekly").value || "UTC";
+      }
+      scheduleBtn.disabled = true;
+      const r = await fetch("/api/schedule", { method: "POST", headers: headers(), body: JSON.stringify(body) });
+      const data = await r.json().catch(() => ({}));
+      scheduleBtn.disabled = false;
+      if (r.ok) {
+        show(scheduleStatus, "Scheduled: " + data.label);
+        loadSchedules();
+      } else show(scheduleStatus, data.error || "Failed", true);
+    });
+
+    async function loadSchedules() {
+      const r = await fetch("/api/schedules", { headers: headers() });
+      if (!r.ok) { scheduleList.innerHTML = "<li>Could not load schedules</li>"; return; }
+      const { schedules } = await r.json();
+      if (schedules.length === 0) { scheduleList.innerHTML = "<li>No scheduled messages</li>"; return; }
+      scheduleList.innerHTML = schedules.map(s => `
+        <li>
+          <span><strong>${escapeHtml(s.label)}</strong> <span class="schedule-preview">${escapeHtml(s.preview || "")}</span></span>
+          <button class="danger" data-id="${escapeHtml(s.id)}">Delete</button>
+        </li>
+      `).join("");
+      scheduleList.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          const r = await fetch("/api/schedules/" + id, { method: "DELETE", headers: headers() });
+          if (r.ok) loadSchedules();
+        });
+      });
+    }
+
+    (async () => {
+      fillTimeScrollers();
+      await loadChannelsAndCache();
+      await loadSchedules();
+    })();
+  </script>
+</body>
+</html>
