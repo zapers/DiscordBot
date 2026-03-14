@@ -4,8 +4,9 @@ import { createApi } from "./api.js";
 import { initScheduler, addSchedule, listSchedules, removeSchedule } from "./scheduler.js";
 import { buildMessagePayload, hasMessageContent } from "./embedBuilder.js";
 import { save as saveMessage, get as getSavedMessage, list as listSavedMessages, remove as removeSavedMessage } from "./savedMessages.js";
-import { getLogChannelIdsForGuild, addLogChannel, removeLogChannel } from "./deletedLogConfig.js";
+import { getLogChannelIdsForGuild, addLogChannel, removeLogChannel, getAllLogChannels } from "./deletedLogConfig.js";
 import { list as listCustomCommands, get as getCustomCommand, getPrefix as getCustomCommandPrefix } from "./customCommands.js";
+import { getDataDir } from "./dataDir.js";
 
 config();
 
@@ -166,8 +167,10 @@ client.once("clientReady", async () => {
   } catch (e) {
     console.error("Failed to register slash commands:", e);
   }
+  const dataDir = getDataDir();
   const customCount = listCustomCommands().length;
-  console.log(`Custom commands: prefix "${getCustomCommandPrefix()}", ${customCount} command(s). If !commands don't respond, enable "Message Content Intent" in Discord Developer Portal → Bot → Privileged Gateway Intents.`);
+  const logChannelCount = getAllLogChannels().length;
+  console.log(`Data directory: ${dataDir} (deleted-log channels: ${logChannelCount}, custom commands: ${customCount}). On Railway, set DATA_DIR to a volume path (e.g. /data) so this data persists across restarts.`);
   initScheduler(client);
 
   const port = Number(process.env.PORT) || 3000;
@@ -202,10 +205,7 @@ client.on("messageCreate", async (message) => {
   const commandName = (firstSpace === -1 ? afterPrefix : afterPrefix.slice(0, firstSpace)).toLowerCase();
   const rest = firstSpace === -1 ? "" : afterPrefix.slice(firstSpace + 1).trim();
   const cmd = getCustomCommand(commandName);
-  console.log(`Custom command: "${content.slice(0, 50)}" -> name="${commandName}", found=${!!cmd}`);
-  if (!cmd) {
-    return;
-  }
+  if (!cmd) return;
   const author = message.author;
   const mentionedUsers = message.mentions?.users ? Array.from(message.mentions.users.values()) : [];
   const target = mentionedUsers[0] ?? null;
