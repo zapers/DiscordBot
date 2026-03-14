@@ -26,7 +26,7 @@
     .schedule-preview { font-size: 0.875rem; color: #666; }
     .schedule-where { display: block; font-size: 0.8rem; color: #5865f2; margin-top: 0.15rem; }
     .muted { color: #666; font-size: 0.875rem; }
-    .next-run { font-size: 0.8rem; color: #57f287; margin-top: 0.15rem; }
+    .next-run { display: block; font-size: 0.8rem; color: #57f287; margin-top: 0.25rem; }
     .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-left: 0.25rem; }
     .btn-secondary { background: #4f545c; color: #fff; }
     .btn-secondary:hover { background: #686d73; }
@@ -418,9 +418,11 @@
       scheduleList.innerHTML = schedules.map(s => {
         const where = [s.serverName, s.channelName ? "#" + s.channelName : ""].filter(Boolean).join(" › ") || "Unknown channel";
         const pausedBadge = s.paused ? ' <span class="muted" style="font-weight: normal;">(Paused)</span>' : "";
-        const nextRunHtml = s.nextRunAt
-          ? `<span class="next-run" data-next-run="${escapeHtml(s.nextRunAt)}" data-next-run-formatted="${escapeHtml(formatNextRun(s.nextRunAt))}"></span>`
-          : s.paused ? '<span class="next-run muted">Paused</span>' : "";
+        const nextRunHtml = s.paused
+          ? '<span class="next-run muted">Paused</span>'
+          : s.nextRunAt
+            ? `<span class="next-run" data-next-run="${escapeHtml(s.nextRunAt)}" data-next-run-formatted="${escapeHtml(formatNextRun(s.nextRunAt))}"></span>`
+            : '<span class="next-run muted">Next: —</span>';
         return `
         <li>
           <span>
