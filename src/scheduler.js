@@ -172,13 +172,16 @@ export function removeSchedule(id) {
 export function getNextRun(schedule) {
   if (schedule.paused) return null;
   try {
-    const interval = cronParser.parse(schedule.cron, {
+    // cron-parser expects 6 fields (second minute hour day month dayOfWeek); node-cron uses 5
+    const cron = schedule.cron.trim().split(/\s+/).length === 5 ? "0 " + schedule.cron : schedule.cron;
+    const interval = cronParser.parse(cron, {
       currentDate: new Date(),
       tz: schedule.timezone || "UTC",
     });
     const next = interval.next();
     return next.toDate().toISOString();
   } catch (e) {
+    console.warn("getNextRun failed for schedule", schedule.id, e.message);
     return null;
   }
 }
