@@ -39,10 +39,11 @@ export function getConfig(guildId) {
  * @param {string} guildId
  * @param {string} memberRoleId - Role that grants server access (assigned to everyone)
  * @param {string} criminalRoleId - Role assigned when jailed (member role removed)
+ * @param {string[]} [allowedRoleIds] - Roles allowed to use !jail/!unjail (empty = Manage Roles perm required)
  */
-export function setConfig(guildId, memberRoleId, criminalRoleId) {
+export function setConfig(guildId, memberRoleId, criminalRoleId, allowedRoleIds = []) {
   const all = loadAll();
-  all[guildId] = { memberRoleId, criminalRoleId };
+  all[guildId] = { memberRoleId, criminalRoleId, allowedRoleIds };
   saveAll(all);
 }
 

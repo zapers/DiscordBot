@@ -389,20 +389,34 @@ export function createApi(client) {
       const configs = getAllJailConfigs();
       const enriched = await Promise.all(
         Object.entries(configs).map(async ([guildId, cfg]) => {
-          let guildName = "";
-          let memberRoleName = "";
-          let criminalRoleName = "";
+          let guildName = guildId;
+          let memberRoleName = cfg.memberRoleId;
+          let criminalRoleName = cfg.criminalRoleId;
+          const allowedRoleNames = [];
           try {
-            const guild = await client.guilds.fetch(guildId).catch(() => null);
+            const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
             if (guild) {
               guildName = guild.name;
+              if (!guild.roles.cache.size) await guild.roles.fetch().catch(() => {});
               const mRole = guild.roles.cache.get(cfg.memberRoleId);
-              memberRoleName = mRole?.name || cfg.memberRoleId;
+              if (mRole) memberRoleName = mRole.name;
               const cRole = guild.roles.cache.get(cfg.criminalRoleId);
-              criminalRoleName = cRole?.name || cfg.criminalRoleId;
+              if (cRole) criminalRoleName = cRole.name;
+              if (cfg.allowedRoleIds?.length > 0) {
+                for (const rid of cfg.allowedRoleIds) {
+                  const r = guild.roles.cache.get(rid);
+                  allowedRoleNames.push(r ? r.name : rid);
+                }
+              }
             }
           } catch (_) {}
-          return { guildId, guildName, memberRoleId: cfg.memberRoleId, memberRoleName, criminalRoleId: cfg.criminalRoleId, criminalRoleName };
+          return {
+            guildId, guildName,
+            memberRoleId: cfg.memberRoleId, memberRoleName,
+            criminalRoleId: cfg.criminalRoleId, criminalRoleName,
+            allowedRoleIds: cfg.allowedRoleIds || [],
+            allowedRoleNames,
+          };
         })
       );
       res.json({ configs: enriched });
