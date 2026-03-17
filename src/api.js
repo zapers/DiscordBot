@@ -7,6 +7,7 @@ import { getAllLogChannels, removeLogChannel as removeDeletedLogChannel } from "
 import { list as listSavedMessages, save as saveSavedMessage, get as getSavedMessage, remove as removeSavedMessage } from "./savedMessages.js";
 import { list as listCustomCommands, add as addCustomCommand, remove as removeCustomCommand, getPrefix as getCustomCommandPrefix } from "./customCommands.js";
 import { getAllConfigs as getAllJailConfigs, removeConfig as removeJailConfig } from "./jailConfig.js";
+import { getLeaderboard as getEcoLeaderboard, JOBS, SHOP_ITEMS, QUESTS } from "./economy.js";
 import { create as createUser, validate as validateUser, getById, getByDiscordId, setDiscord, unsetDiscord, hasAnyUser } from "./users.js";
 import { getDataDir } from "./dataDir.js";
 
@@ -436,6 +437,29 @@ export function createApi(client) {
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  /** Economy: leaderboard for a guild */
+  app.get("/api/economy/leaderboard/:guildId", async (req, res) => {
+    try {
+      const lb = getEcoLeaderboard(req.params.guildId, 20);
+      const enriched = await Promise.all(lb.map(async (entry) => {
+        let username = entry.userId;
+        try {
+          const user = await client.users.fetch(entry.userId).catch(() => null);
+          if (user) username = user.displayName || user.username;
+        } catch (_) {}
+        return { ...entry, username };
+      }));
+      res.json({ leaderboard: enriched });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /** Economy: static info (jobs, shop, quests) */
+  app.get("/api/economy/info", (req, res) => {
+    res.json({ jobs: JOBS, shop: SHOP_ITEMS, quests: QUESTS });
   });
 
   app.get("/api/channels", async (req, res) => {

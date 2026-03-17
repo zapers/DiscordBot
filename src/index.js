@@ -9,6 +9,7 @@ import { save as saveMessage, get as getSavedMessage, list as listSavedMessages,
 import { getLogChannelIdsForGuild, addLogChannel, removeLogChannel, getAllLogChannels } from "./deletedLogConfig.js";
 import { list as listCustomCommands, get as getCustomCommand, getPrefix as getCustomCommandPrefix } from "./customCommands.js";
 import { getConfig as getJailConfig, setConfig as setJailConfig, saveJailedRoles, popJailedRoles } from "./jailConfig.js";
+import { handleEconomyCommand, ECONOMY_COMMAND_NAMES } from "./economyCommands.js";
 import { getDataDir } from "./dataDir.js";
 
 config();
@@ -250,6 +251,16 @@ client.on("messageCreate", async (message) => {
   const firstSpace = afterPrefix.indexOf(" ");
   const commandName = (firstSpace === -1 ? afterPrefix : afterPrefix.slice(0, firstSpace)).toLowerCase().replace(/\s/g, "");
   const rest = firstSpace === -1 ? "" : afterPrefix.slice(firstSpace + 1).trim();
+
+  // Economy commands
+  if (ECONOMY_COMMAND_NAMES.has(commandName)) {
+    try {
+      await handleEconomyCommand(message, commandName, rest);
+    } catch (e) {
+      console.error("Economy command error:", e);
+    }
+    return;
+  }
 
   // Built-in: !jail @user and !unjail @user
   if (commandName === "jail" || commandName === "unjail") {
