@@ -845,9 +845,13 @@
         for (const c of data.configs) {
           const li = document.createElement("li");
           li.style.marginBottom = "0.5rem";
+          const allowedText = c.allowedRoleNames && c.allowedRoleNames.length > 0
+            ? c.allowedRoleNames.map(n => esc(n)).join(", ")
+            : "Anyone with Manage Roles";
           li.innerHTML = `<strong>${esc(c.guildName || c.guildId)}</strong><br>
             <span class="muted">Member role:</span> ${esc(c.memberRoleName || c.memberRoleId)}<br>
-            <span class="muted">Criminal role:</span> ${esc(c.criminalRoleName || c.criminalRoleId)}`;
+            <span class="muted">Criminal role:</span> ${esc(c.criminalRoleName || c.criminalRoleId)}<br>
+            <span class="muted">Allowed to jail:</span> ${allowedText}`;
           if (window._isAdmin) {
             const btn = document.createElement("button");
             btn.textContent = "Remove";

@@ -169,6 +169,9 @@ const jailSetupCommand = {
   options: [
     { name: "member_role", type: 8, description: "Role that grants server access (given to everyone)", required: true },
     { name: "criminal_role", type: 8, description: "Role assigned when jailed (member role removed)", required: true },
+    { name: "allowed_role_1", type: 8, description: "Role allowed to use !jail/!unjail (optional)", required: false },
+    { name: "allowed_role_2", type: 8, description: "Second allowed role (optional)", required: false },
+    { name: "allowed_role_3", type: 8, description: "Third allowed role (optional)", required: false },
   ],
 };
 
@@ -254,6 +257,14 @@ client.on("messageCreate", async (message) => {
     if (!guildId) return;
     const cfg = getJailConfig(guildId);
     if (!cfg) return message.channel.send({ content: "Jail not configured. An admin must run `/jail-setup` first." }).catch(() => {});
+    const invoker = message.member ?? (await message.guild.members.fetch(message.author.id).catch(() => null));
+    if (!invoker) return;
+    const hasAllowedRole = cfg.allowedRoleIds?.length > 0
+      ? cfg.allowedRoleIds.some((id) => invoker.roles.cache.has(id))
+      : invoker.permissions?.has("ManageRoles");
+    if (!hasAllowedRole) {
+      return message.channel.send({ content: "You don't have permission to use this command." }).catch(() => {});
+    }
     const mentionedUsers = message.mentions?.users ? Array.from(message.mentions.users.values()) : [];
     const target = mentionedUsers[0];
     if (!target) return message.channel.send({ content: `Usage: \`!${commandName} @user\`` }).catch(() => {});
@@ -340,10 +351,19 @@ client.on("interactionCreate", async (interaction) => {
     if (!memberRole || !criminalRole) {
       return interaction.reply({ content: "Both roles are required.", ephemeral: true });
     }
+    const allowedRoles = [
+      interaction.options.getRole("allowed_role_1"),
+      interaction.options.getRole("allowed_role_2"),
+      interaction.options.getRole("allowed_role_3"),
+    ].filter(Boolean);
+    const allowedRoleIds = allowedRoles.map((r) => r.id);
     try {
-      setJailConfig(interaction.guildId, memberRole.id, criminalRole.id);
+      setJailConfig(interaction.guildId, memberRole.id, criminalRole.id, allowedRoleIds);
+      const allowedText = allowedRoles.length > 0
+        ? `\n**Allowed roles:** ${allowedRoles.map((r) => r.name).join(", ")}`
+        : "\n**Allowed roles:** Anyone with Manage Roles permission";
       return interaction.reply({
-        content: `Jail configured.\n**Member role:** ${memberRole.name} (given to all new members)\n**Criminal role:** ${criminalRole.name} (given when jailed)\n\nUse \`!jail @user\` to jail and \`!unjail @user\` to release.\nRun \`/jail-assign-all\` to give the member role to everyone currently in the server.`,
+        content: `Jail configured.\n**Member role:** ${memberRole.name} (given to all new members)\n**Criminal role:** ${criminalRole.name} (given when jailed)${allowedText}\n\nUse \`!jail @user\` to jail and \`!unjail @user\` to release.\nRun \`/jail-assign-all\` to give the member role to everyone currently in the server.`,
         ephemeral: false,
       });
     } catch (e) {
