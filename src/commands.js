@@ -193,9 +193,19 @@ export const clearWarningsCommand = {
   ],
 };
 
+export const purgeCommand = {
+  name: "purge",
+  description: "Bulk delete messages from this channel",
+  options: [
+    { name: "amount", type: 4, description: "Number of messages to delete (1–100)", required: true, min_value: 1, max_value: 100 },
+    { name: "user", type: 6, description: "Only delete messages from this user", required: false },
+  ],
+};
+
 export const slashCommands = [
   sendCommand, scheduleCommand, messageCommand, logDeletesCommand,
   jailSetupCommand, jailAssignAllCommand,
   levelCommand, leaderboardCommand,
   warnCommand, warningsCommand, clearWarningsCommand,
+  purgeCommand,
 ];
