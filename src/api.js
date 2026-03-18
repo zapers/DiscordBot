@@ -388,40 +388,43 @@ export function createApi(client) {
   app.get("/api/jail-config", async (req, res) => {
     try {
       const configs = getAllJailConfigs();
-      const enriched = await Promise.all(
-        Object.entries(configs).map(async ([guildId, cfg]) => {
-          let guildName = guildId;
-          let memberRoleName = cfg.memberRoleId;
-          let criminalRoleName = cfg.criminalRoleId;
-          const allowedRoleNames = [];
-          try {
-            const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
-            if (guild) {
-              guildName = guild.name;
-              if (!guild.roles.cache.size) await guild.roles.fetch().catch(() => {});
-              const mRole = guild.roles.cache.get(cfg.memberRoleId);
-              if (mRole) memberRoleName = mRole.name;
-              const cRole = guild.roles.cache.get(cfg.criminalRoleId);
-              if (cRole) criminalRoleName = cRole.name;
-              if (cfg.allowedRoleIds?.length > 0) {
-                for (const rid of cfg.allowedRoleIds) {
-                  const r = guild.roles.cache.get(rid);
-                  allowedRoleNames.push(r ? r.name : rid);
-                }
+      const entries = Object.entries(configs);
+      const enriched = [];
+      for (const [guildId, cfg] of entries) {
+        const item = {
+          guildId,
+          guildName: guildId,
+          memberRoleId: cfg?.memberRoleId || "unknown",
+          memberRoleName: cfg?.memberRoleId || "unknown",
+          criminalRoleId: cfg?.criminalRoleId || "unknown",
+          criminalRoleName: cfg?.criminalRoleId || "unknown",
+          allowedRoleIds: cfg?.allowedRoleIds || [],
+          allowedRoleNames: [],
+        };
+        try {
+          const guild = client.guilds.cache.get(guildId);
+          if (guild) {
+            item.guildName = guild.name;
+            try { await guild.roles.fetch(); } catch (_) {}
+            const mRole = guild.roles.cache.get(cfg.memberRoleId);
+            if (mRole) item.memberRoleName = mRole.name;
+            const cRole = guild.roles.cache.get(cfg.criminalRoleId);
+            if (cRole) item.criminalRoleName = cRole.name;
+            if (cfg.allowedRoleIds?.length > 0) {
+              for (const rid of cfg.allowedRoleIds) {
+                const r = guild.roles.cache.get(rid);
+                item.allowedRoleNames.push(r ? r.name : rid);
               }
             }
-          } catch (_) {}
-          return {
-            guildId, guildName,
-            memberRoleId: cfg.memberRoleId, memberRoleName,
-            criminalRoleId: cfg.criminalRoleId, criminalRoleName,
-            allowedRoleIds: cfg.allowedRoleIds || [],
-            allowedRoleNames,
-          };
-        })
-      );
+          }
+        } catch (e) {
+          console.error(`Jail config enrichment error for guild ${guildId}:`, e.message);
+        }
+        enriched.push(item);
+      }
       res.json({ configs: enriched });
     } catch (e) {
+      console.error("GET /api/jail-config failed:", e);
       res.status(500).json({ error: e.message });
     }
   });

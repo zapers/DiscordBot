@@ -1022,6 +1022,11 @@
       listEl.innerHTML = "<li class=\"muted\">Loading...</li>";
       try {
         const r = await fetch("/api/jail-config", fetchOpts({ headers: headers() }));
+        if (!r.ok) {
+          const errText = await r.text().catch(() => r.status);
+          listEl.innerHTML = `<li class="muted">Error ${r.status}: ${esc(String(errText).slice(0, 200))}</li>`;
+          return;
+        }
         const data = await r.json();
         if (!data.configs || data.configs.length === 0) {
           listEl.innerHTML = "<li class=\"muted\">No servers configured yet. Run <code>/jail-setup</code> in Discord.</li>";
@@ -1030,19 +1035,21 @@
         listEl.innerHTML = "";
         for (const c of data.configs) {
           const li = document.createElement("li");
-          li.style.marginBottom = "0.5rem";
+          li.style.cssText = "flex-direction: column; align-items: flex-start;";
           const allowedText = c.allowedRoleNames && c.allowedRoleNames.length > 0
             ? c.allowedRoleNames.map(n => esc(n)).join(", ")
             : "Anyone with Manage Roles";
-          li.innerHTML = `<strong>${esc(c.guildName || c.guildId)}</strong><br>
+          const infoDiv = document.createElement("div");
+          infoDiv.innerHTML = `<strong>${esc(c.guildName || c.guildId)}</strong><br>
             <span class="muted">Member role:</span> ${esc(c.memberRoleName || c.memberRoleId)}<br>
             <span class="muted">Criminal role:</span> ${esc(c.criminalRoleName || c.criminalRoleId)}<br>
             <span class="muted">Allowed to jail:</span> ${allowedText}`;
+          li.appendChild(infoDiv);
           if (window._isAdmin) {
             const btn = document.createElement("button");
             btn.textContent = "Remove";
             btn.className = "btn-sm btn-secondary";
-            btn.style.marginLeft = "0.5rem";
+            btn.style.marginTop = "0.5rem";
             btn.onclick = async () => {
               if (!confirm("Remove jail config for this server?")) return;
               await fetch(`/api/jail-config/${c.guildId}`, fetchOpts({ method: "DELETE", headers: headers() }));
@@ -1053,7 +1060,8 @@
           listEl.appendChild(li);
         }
       } catch (e) {
-        listEl.innerHTML = "<li class=\"muted\">Failed to load jail config.</li>";
+        console.error("loadJailConfigPage error:", e);
+        listEl.innerHTML = `<li class="muted">Failed to load jail config: ${esc(e.message)}</li>`;
       }
     }
 
