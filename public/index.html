@@ -227,14 +227,14 @@
     <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLandingFromLogin" class="muted" style="font-size: 0.875rem; text-decoration: none;">← Back to home</a></p>
     <h1>Welcome back</h1>
     <p class="muted" style="margin-bottom: 1rem;">Log in with your email or Discord (if you’ve already linked it).</p>
-    <div class="section" style="margin-bottom: 1rem;">
+    <form id="loginForm" class="section" style="margin-bottom: 1rem;" autocomplete="on">
       <label for="loginEmail">Email</label>
-      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
+      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required>
       <label for="loginPassword">Password</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
-      <button type="button" id="loginBtn" style="width: 100%;">Log in</button>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
+      <button type="submit" id="loginBtn" style="width: 100%;">Log in</button>
       <p id="loginStatus" class="muted" style="font-size: 0.875rem; margin-top: 0.25rem;"></p>
-    </div>
+    </form>
     <div id="discordLoginWrap" class="section" style="display: none;">
       <p class="muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">Or log in with Discord (only if you already linked your account)</p>
       <a href="/api/auth/discord" id="discordLoginBtn" class="discord-btn">Login with Discord</a>
@@ -249,14 +249,14 @@
     <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLandingFromRegister" class="muted" style="font-size: 0.875rem; text-decoration: none;">← Back to home</a></p>
     <h1>Create an account</h1>
     <p class="muted" style="margin-bottom: 1rem;">You can link your Discord account after signing up.</p>
-    <div class="section" style="margin-bottom: 1rem;">
+    <form id="registerForm" class="section" style="margin-bottom: 1rem;" autocomplete="on">
       <label for="registerEmail">Email</label>
-      <input type="email" id="registerEmail" placeholder="you@example.com" autocomplete="email">
+      <input type="email" id="registerEmail" placeholder="you@example.com" autocomplete="email" required>
       <label for="registerPassword">Password (min 6 characters)</label>
-      <input type="password" id="registerPassword" placeholder="••••••••" autocomplete="new-password">
-      <button type="button" id="registerBtn" style="width: 100%;">Create account</button>
+      <input type="password" id="registerPassword" placeholder="••••••••" autocomplete="new-password" required minlength="6">
+      <button type="submit" id="registerBtn" style="width: 100%;">Create account</button>
       <p id="registerStatus" class="muted" style="font-size: 0.875rem; margin-top: 0.25rem;"></p>
-    </div>
+    </form>
     <p class="muted" style="margin-top: 1rem; font-size: 0.875rem;">Already have an account? <a href="#" id="goToLoginFromRegister" style="color: var(--btn-primary);">Log in</a></p>
     <p style="margin-top: 0.5rem;"><button type="button" id="darkModeBtnRegister" class="btn-sm btn-secondary">Dark mode</button></p>
   </div>
@@ -265,13 +265,13 @@
     <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLoginFromVerify" class="muted" style="font-size: 0.875rem; text-decoration: none;">← Back to login</a></p>
     <h1>Verify your email</h1>
     <p class="muted" style="margin-bottom: 1rem;">We sent a 6-digit code to <strong id="verifyEmailDisplay"></strong>. Enter it below.</p>
-    <div class="section" style="margin-bottom: 1rem;">
+    <form id="verifyForm" class="section" style="margin-bottom: 1rem;">
       <label for="verifyCodeInput">Verification code</label>
-      <input type="text" id="verifyCodeInput" placeholder="000000" maxlength="6" autocomplete="one-time-code" style="font-size: 1.5rem; text-align: center; letter-spacing: 8px; font-family: monospace;">
-      <button type="button" id="verifyBtn" style="width: 100%; margin-top: 0.5rem;">Verify</button>
+      <input type="text" id="verifyCodeInput" placeholder="000000" maxlength="6" autocomplete="one-time-code" required style="font-size: 1.5rem; text-align: center; letter-spacing: 8px; font-family: monospace;">
+      <button type="submit" id="verifyBtn" style="width: 100%; margin-top: 0.5rem;">Verify</button>
       <p id="verifyStatus" class="muted" style="font-size: 0.875rem; margin-top: 0.25rem;"></p>
       <p style="margin-top: 0.75rem; font-size: 0.875rem;" class="muted">Didn't receive the code? <a href="#" id="resendCodeLink" style="color: var(--btn-primary);">Resend</a></p>
-    </div>
+    </form>
     <p style="margin-top: 0.5rem;"><button type="button" id="darkModeBtnVerify" class="btn-sm btn-secondary">Dark mode</button></p>
   </div>
 
@@ -626,7 +626,8 @@
       showLogin();
     });
 
-    document.getElementById("registerBtn").addEventListener("click", async () => {
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
       const email = document.getElementById("registerEmail").value.trim();
       const password = document.getElementById("registerPassword").value;
       const statusEl = document.getElementById("registerStatus");
@@ -648,7 +649,8 @@
       }
     });
 
-    document.getElementById("loginBtn").addEventListener("click", async () => {
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
       const email = document.getElementById("loginEmail").value.trim();
       const password = document.getElementById("loginPassword").value;
       const statusEl = document.getElementById("loginStatus");
@@ -670,7 +672,8 @@
     });
 
     // Verification page handlers
-    document.getElementById("verifyBtn").addEventListener("click", async () => {
+    document.getElementById("verifyForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
       const code = document.getElementById("verifyCodeInput").value.trim();
       const statusEl = document.getElementById("verifyStatus");
       if (!code) { statusEl.textContent = "Enter the code from your email."; statusEl.className = "error"; return; }
