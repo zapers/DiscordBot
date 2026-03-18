@@ -241,8 +241,10 @@ export class MusicQueue {
         song.url,
       ], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 
+      const vol = this.volume / 100;
       const ffmpeg = spawn(FFMPEG, [
         "-i", "pipe:0",
+        "-af", `volume=${vol}`,
         "-c:a", "libopus",
         "-b:a", "128k",
         "-ar", "48000",
@@ -283,9 +285,7 @@ export class MusicQueue {
 
       const resource = createAudioResource(ffmpeg.stdout, {
         inputType: StreamType.OggOpus,
-        inlineVolume: true,
       });
-      resource.volume?.setVolume(this.volume / 100);
       this.player.play(resource);
       this.playing = true;
     } catch (e) {
