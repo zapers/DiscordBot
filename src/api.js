@@ -385,44 +385,24 @@ export function createApi(client) {
     }
   });
 
-  /** Jail config: list all guilds with jail configured. */
-  app.get("/api/jail-config", async (req, res) => {
+  /** Jail config: list all guilds with jail configured. No async Discord API calls. */
+  app.get("/api/jail-config", (req, res) => {
     try {
       const configs = getAllJailConfigs();
-      const entries = Object.entries(configs);
-      const enriched = [];
-      for (const [guildId, cfg] of entries) {
-        const item = {
+      const enriched = Object.entries(configs).map(([guildId, cfg]) => {
+        const guild = client.guilds.cache.get(guildId);
+        const roleName = (id) => guild?.roles?.cache?.get(id)?.name || id;
+        return {
           guildId,
-          guildName: guildId,
-          memberRoleId: cfg?.memberRoleId || "unknown",
-          memberRoleName: cfg?.memberRoleId || "unknown",
-          criminalRoleId: cfg?.criminalRoleId || "unknown",
-          criminalRoleName: cfg?.criminalRoleId || "unknown",
+          guildName: guild?.name || guildId,
+          memberRoleId: cfg?.memberRoleId || "?",
+          memberRoleName: roleName(cfg?.memberRoleId),
+          criminalRoleId: cfg?.criminalRoleId || "?",
+          criminalRoleName: roleName(cfg?.criminalRoleId),
           allowedRoleIds: cfg?.allowedRoleIds || [],
-          allowedRoleNames: [],
+          allowedRoleNames: (cfg?.allowedRoleIds || []).map((id) => roleName(id)),
         };
-        try {
-          const guild = client.guilds.cache.get(guildId);
-          if (guild) {
-            item.guildName = guild.name;
-            try { await guild.roles.fetch(); } catch (_) {}
-            const mRole = guild.roles.cache.get(cfg.memberRoleId);
-            if (mRole) item.memberRoleName = mRole.name;
-            const cRole = guild.roles.cache.get(cfg.criminalRoleId);
-            if (cRole) item.criminalRoleName = cRole.name;
-            if (cfg.allowedRoleIds?.length > 0) {
-              for (const rid of cfg.allowedRoleIds) {
-                const r = guild.roles.cache.get(rid);
-                item.allowedRoleNames.push(r ? r.name : rid);
-              }
-            }
-          }
-        } catch (e) {
-          console.error(`Jail config enrichment error for guild ${guildId}:`, e.message);
-        }
-        enriched.push(item);
-      }
+      });
       res.json({ configs: enriched });
     } catch (e) {
       console.error("GET /api/jail-config failed:", e);
@@ -480,27 +460,29 @@ export function createApi(client) {
     }
   });
 
-  /** Economy: leaderboard for a guild */
-  app.get("/api/economy/leaderboard/:guildId", async (req, res) => {
+  /** Economy: leaderboard for a guild. Uses cache only, no Discord API calls. */
+  app.get("/api/economy/leaderboard/:guildId", (req, res) => {
     try {
       const lb = getEcoLeaderboard(req.params.guildId, 20);
-      const enriched = await Promise.all(lb.map(async (entry) => {
-        let username = entry.userId;
-        try {
-          const user = await client.users.fetch(entry.userId).catch(() => null);
-          if (user) username = user.displayName || user.username;
-        } catch (_) {}
-        return { ...entry, username };
-      }));
+      const enriched = lb.map((entry) => {
+        const cached = client.users.cache.get(entry.userId);
+        return { ...entry, username: cached?.displayName || cached?.username || entry.userId };
+      });
       res.json({ leaderboard: enriched });
     } catch (e) {
+      console.error("GET /api/economy/leaderboard failed:", e);
       res.status(500).json({ error: e.message });
     }
   });
 
   /** Economy: static info (jobs, shop, quests) */
   app.get("/api/economy/info", (req, res) => {
-    res.json({ jobs: JOBS, shop: SHOP_ITEMS, quests: QUESTS });
+    try {
+      res.json({ jobs: JOBS || [], shop: SHOP_ITEMS || [], quests: QUESTS || [] });
+    } catch (e) {
+      console.error("GET /api/economy/info failed:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/channels", async (req, res) => {
