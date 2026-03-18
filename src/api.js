@@ -30,7 +30,7 @@ const ADMIN_DISCORD_IDS = (process.env.ADMIN_DISCORD_IDS || "")
   .filter(Boolean);
 /** @type {Map<string, { userId: string, email: string, discordId?: string, username?: string, expiresAt?: number }>} */
 const sessions = new Map();
-const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days, matches cookie MaxAge
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days, matches cookie Max-Age
 
 function getSessionsPath() {
   return join(getDataDir(), "sessions.json");
@@ -156,7 +156,7 @@ export function createApi(client) {
     if (!user) return res.status(500).json({ error: "Account created but login failed" });
     const sessionToken = randomBytes(24).toString("hex");
     sessionSet(sessionToken, { userId: user.id, email: user.email, discordId: user.discordId, username: user.discordUsername });
-    res.setHeader("Set-Cookie", "admin_session=" + sessionToken + "; Path=/; HttpOnly; SameSite=Lax; MaxAge=604800");
+    res.setHeader("Set-Cookie", "admin_session=" + sessionToken + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800");
     return res.json({ ok: true, user: { email: user.email, discordId: user.discordId, username: user.discordUsername } });
   });
 
@@ -172,7 +172,7 @@ export function createApi(client) {
     if (!user) return res.status(500).json({ error: "User not found" });
     const sessionToken = randomBytes(24).toString("hex");
     sessionSet(sessionToken, { userId: user.id, email: user.email });
-    res.setHeader("Set-Cookie", "admin_session=" + sessionToken + "; Path=/; HttpOnly; SameSite=Lax; MaxAge=604800");
+    res.setHeader("Set-Cookie", "admin_session=" + sessionToken + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800");
     return res.json({ ok: true, user: { email: user.email } });
   });
 
@@ -200,7 +200,7 @@ export function createApi(client) {
     }
     const sessionToken = randomBytes(24).toString("hex");
     sessionSet(sessionToken, { userId: user.id, email: user.email, discordId: user.discordId, username: user.discordUsername });
-    res.setHeader("Set-Cookie", "admin_session=" + sessionToken + "; Path=/; HttpOnly; SameSite=Lax; MaxAge=604800");
+    res.setHeader("Set-Cookie", "admin_session=" + sessionToken + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800");
     return res.json({ ok: true, user: { email: user.email, discordId: user.discordId, username: user.discordUsername } });
   });
 
@@ -268,7 +268,7 @@ export function createApi(client) {
       if (appUser) {
         const sessionTokenNew = randomBytes(24).toString("hex");
         sessionSet(sessionTokenNew, { userId: appUser.id, email: appUser.email, discordId: appUser.discordId, username: appUser.discordUsername });
-        res.setHeader("Set-Cookie", "admin_session=" + sessionTokenNew + "; Path=/; HttpOnly; SameSite=Lax; MaxAge=604800");
+        res.setHeader("Set-Cookie", "admin_session=" + sessionTokenNew + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800");
         return res.redirect("/");
       }
       return res.redirect("/?error=discord_not_linked");
@@ -297,7 +297,7 @@ export function createApi(client) {
   app.post("/api/logout", (req, res) => {
     const token = getCookie(req, "admin_session");
     if (token) sessionDelete(token);
-    res.setHeader("Set-Cookie", "admin_session=; Path=/; HttpOnly; MaxAge=0");
+    res.setHeader("Set-Cookie", "admin_session=; Path=/; HttpOnly; Max-Age=0");
     res.json({ ok: true });
   });
 
