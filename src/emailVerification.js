@@ -17,6 +17,9 @@ const CODE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 /** @type {Map<string, { code: string, expiresAt: number }>} */
 const pendingCodes = new Map();
 
+/** @type {Map<string, { email: string, password: string, expiresAt: number }>} */
+const pendingRegistrations = new Map();
+
 /** Returns true if any email provider is configured (Resend or SMTP). */
 export function isSmtpConfigured() {
   return !!(RESEND_API_KEY || (SMTP_HOST && SMTP_USER && SMTP_PASS));
@@ -128,10 +131,59 @@ export function verifyCode(email, code) {
   return "ok";
 }
 
-// Clean expired codes every 5 minutes
+/**
+ * Store a pending registration (email + password) until the code is verified.
+ * @param {string} email
+ * @param {string} password
+ */
+export function setPendingRegistration(email, password) {
+  pendingRegistrations.set(email.toLowerCase(), {
+    email: email.toLowerCase(),
+    password,
+    expiresAt: Date.now() + CODE_EXPIRY_MS,
+  });
+}
+
+/**
+ * Retrieve and remove a pending registration after successful verification.
+ * @param {string} email
+ * @returns {{ email: string, password: string } | null}
+ */
+export function popPendingRegistration(email) {
+  const key = email.toLowerCase();
+  const entry = pendingRegistrations.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    pendingRegistrations.delete(key);
+    return null;
+  }
+  pendingRegistrations.delete(key);
+  return { email: entry.email, password: entry.password };
+}
+
+/**
+ * Check if a pending registration exists (for resend).
+ * @param {string} email
+ * @returns {boolean}
+ */
+export function hasPendingRegistration(email) {
+  const key = email.toLowerCase();
+  const entry = pendingRegistrations.get(key);
+  if (!entry) return false;
+  if (Date.now() > entry.expiresAt) {
+    pendingRegistrations.delete(key);
+    return false;
+  }
+  return true;
+}
+
+// Clean expired codes and pending registrations every 5 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of pendingCodes) {
     if (now > v.expiresAt) pendingCodes.delete(k);
+  }
+  for (const [k, v] of pendingRegistrations) {
+    if (now > v.expiresAt) pendingRegistrations.delete(k);
   }
 }, 5 * 60 * 1000);
