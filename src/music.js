@@ -24,18 +24,26 @@ let spotifyTokenExpiry = 0;
 /**
  * Run yt-dlp with given args and return stdout as a string.
  */
-function ytdlp(args) {
+function ytdlp(args, timeoutMs = 30_000) {
   return new Promise((resolve, reject) => {
     const proc = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
+    const timer = setTimeout(() => {
+      proc.kill("SIGTERM");
+      reject(new Error(`yt-dlp timed out after ${timeoutMs / 1000}s`));
+    }, timeoutMs);
     proc.stdout.on("data", (d) => (out += d));
     proc.stderr.on("data", (d) => (err += d));
     proc.on("close", (code) => {
+      clearTimeout(timer);
       if (code === 0) resolve(out.trim());
       else reject(new Error(err.trim() || `yt-dlp exited with code ${code}`));
     });
-    proc.on("error", reject);
+    proc.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
   });
 }
 
@@ -128,10 +136,10 @@ async function spotifyGetTracks(type, id) {
 export async function initMusic() {
   // Verify yt-dlp is available
   try {
-    const ver = await ytdlp(["--version"]);
+    const ver = await ytdlp(["--version"], 5_000);
     console.log(`Music: yt-dlp ${ver} found.`);
-  } catch {
-    console.warn("Music: yt-dlp not found — music commands will not work. Install yt-dlp.");
+  } catch (e) {
+    console.warn("Music: yt-dlp not found — music commands will not work.", e.message);
   }
 
   const spotifyId = process.env.SPOTIFY_CLIENT_ID?.trim();
@@ -396,7 +404,8 @@ async function searchYouTube(query) {
       "--dump-json",
       "--no-playlist",
       "--no-warnings",
-    ]);
+      "--default-search", "ytsearch",
+    ], 15_000);
     const data = JSON.parse(json);
     return {
       url: data.webpage_url || `https://www.youtube.com/watch?v=${data.id}`,
@@ -404,7 +413,8 @@ async function searchYouTube(query) {
       duration: formatDuration(data.duration || 0),
       thumbnail: data.thumbnail || null,
     };
-  } catch {
+  } catch (e) {
+    console.error("yt-dlp search failed:", e.message);
     return null;
   }
 }
