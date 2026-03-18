@@ -3,22 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discord Bot Panel</title>
+  <title>Little Helper</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; }
     :root {
-      --bg: #f8f9fc;
+      --bg: #f0f2f8;
       --bg-surface: #fff;
       --text: #1a1a2e;
       --text-muted: #6b7280;
-      --border: #e5e7eb;
+      --border: #e2e5ee;
       --input-bg: #fff;
       --card-bg: #fff;
-      --card-border: #e5e7eb;
-      --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --card-border: #e2e5ee;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+      --card-hover-shadow: 0 4px 12px rgba(0,0,0,0.08);
       --btn-primary: #5865f2;
       --btn-primary-hover: #4752c4;
       --btn-secondary: #6b7280;
@@ -29,19 +30,25 @@
       --error: #ef4444;
       --accent: #5865f2;
       --accent-soft: rgba(88,101,242,0.08);
-      --radius: 8px;
-      --radius-lg: 12px;
+      --accent-glow: rgba(88,101,242,0.15);
+      --radius: 10px;
+      --radius-lg: 14px;
+      --nav-active-bg: var(--btn-primary);
+      --nav-active-shadow: 0 2px 8px rgba(88,101,242,0.35);
+      --gradient-start: #a78bfa;
+      --gradient-end: #6366f1;
     }
     [data-theme="dark"] {
-      --bg: #111827;
-      --bg-surface: #1f2937;
-      --text: #f3f4f6;
+      --bg: #0f1219;
+      --bg-surface: #1a1f2e;
+      --text: #f0f1f5;
       --text-muted: #9ca3af;
-      --border: #374151;
-      --input-bg: #1f2937;
-      --card-bg: #1f2937;
-      --card-border: #374151;
+      --border: #2a3142;
+      --input-bg: #1a1f2e;
+      --card-bg: #1a1f2e;
+      --card-border: #2a3142;
       --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+      --card-hover-shadow: 0 4px 16px rgba(0,0,0,0.4);
       --btn-primary: #5865f2;
       --btn-primary-hover: #6d7aff;
       --btn-secondary: #4b5563;
@@ -52,6 +59,10 @@
       --error: #f87171;
       --accent: #818cf8;
       --accent-soft: rgba(129,140,248,0.1);
+      --accent-glow: rgba(129,140,248,0.12);
+      --nav-active-shadow: 0 2px 8px rgba(129,140,248,0.3);
+      --gradient-start: #7c3aed;
+      --gradient-end: #4f46e5;
     }
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -101,6 +112,10 @@
       margin-bottom: 1.5rem; padding: 1.25rem;
       background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+      transition: box-shadow 0.2s;
+    }
+    .section:hover {
+      box-shadow: var(--card-hover-shadow);
     }
     .section + .section { margin-top: 1rem; }
     .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
@@ -109,18 +124,18 @@
     .success { color: var(--success); margin-top: 0.5rem; font-size: 0.875rem; }
     ul, ol { list-style: none; padding: 0; margin: 0; }
     li {
-      padding: 0.65rem 0.85rem; background: var(--bg);
+      padding: 0.75rem 0.95rem; background: var(--bg);
       border: 1px solid var(--card-border); border-radius: var(--radius);
       margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;
-      transition: border-color 0.15s;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
     }
-    li:hover { border-color: var(--accent); }
+    li:hover { border-color: var(--accent); box-shadow: 0 2px 8px var(--accent-glow); transform: translateY(-1px); }
     ol li { list-style: none; }
     .schedule-preview { font-size: 0.85rem; color: var(--text-muted); }
     .schedule-where { display: block; font-size: 0.8rem; color: var(--accent); margin-top: 0.15rem; font-weight: 500; }
     .muted { color: var(--text-muted); font-size: 0.875rem; }
     .next-run { display: block; font-size: 0.8rem; color: var(--success); margin-top: 0.25rem; font-weight: 500; }
-    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.78rem; margin-left: 0.25rem; border-radius: 6px; }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.78rem; margin-left: 0.25rem; border-radius: 8px; }
     .btn-secondary { background: var(--btn-secondary); color: #fff; }
     .btn-secondary:hover { background: var(--btn-secondary-hover); box-shadow: none; }
     code { background: var(--accent-soft); color: var(--accent); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.82rem; font-weight: 500; }
@@ -130,19 +145,25 @@
     #editScheduleModal h3 { margin-top: 0; }
     .nav {
       display: flex; gap: 0.25rem; margin-bottom: 1.25rem; flex-wrap: wrap;
-      padding: 0.3rem; background: var(--card-bg); border: 1px solid var(--card-border);
+      padding: 0.35rem; background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
     }
     .nav a {
       color: var(--text-muted); text-decoration: none;
-      padding: 0.45rem 0.85rem; border-radius: var(--radius);
+      padding: 0.5rem 0.9rem; border-radius: 10px;
       font-size: 0.85rem; font-weight: 500;
-      transition: color 0.15s, background 0.15s;
+      transition: color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s;
+      position: relative;
     }
-    .nav a:hover { color: var(--text); background: var(--accent-soft); }
-    .nav a.active { color: #fff; background: var(--btn-primary); box-shadow: 0 1px 4px rgba(88,101,242,0.3); }
+    .nav a:hover { color: var(--text); background: var(--accent-soft); transform: translateY(-1px); }
+    .nav a.active {
+      color: #fff; background: var(--nav-active-bg);
+      box-shadow: var(--nav-active-shadow);
+      transform: translateY(0);
+    }
     .page { display: none; }
-    .page.active { display: block; }
+    .page.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .message-row { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.5rem; }
     .message-row textarea { flex: 1; min-height: 60px; }
     .info-box {
@@ -153,7 +174,7 @@
     /* Landing */
     .landing-wrap { min-height: 100vh; display: flex; flex-direction: column; }
     .landing-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; margin-bottom: 2rem; }
-    .landing-logo { font-size: 1.25rem; font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: -0.02em; }
+    .landing-logo { font-size: 1.25rem; font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.4rem; }
     .landing-auth { display: flex; gap: 0.5rem; align-items: center; }
     .landing-auth a { padding: 0.45rem 1rem; border-radius: var(--radius); font-size: 0.9rem; font-weight: 550; text-decoration: none; transition: all 0.2s; }
     .landing-auth .btn-outline { color: var(--text); border: 1.5px solid var(--border); background: transparent; }
@@ -161,26 +182,49 @@
     .landing-auth .btn-primary { background: var(--btn-primary); color: #fff; border: none; }
     .landing-auth .btn-primary:hover { background: var(--btn-primary-hover); }
     .landing-hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2rem 0; text-align: center; }
-    .landing-hero h1 { font-size: clamp(2rem, 6vw, 3rem); margin-bottom: 0.75rem; line-height: 1.15; font-weight: 800; letter-spacing: -0.03em; }
-    .landing-hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 440px; margin: 0 auto 1.75rem; line-height: 1.6; }
+    .landing-hero h1 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 0.75rem; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; }
+    .landing-hero h1 .gradient-text {
+      background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .landing-hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 2rem; line-height: 1.6; }
     .landing-cta {
       display: inline-flex; align-items: center; gap: 0.5rem;
       padding: 0.85rem 1.75rem; font-size: 1rem; font-weight: 650;
-      background: var(--btn-primary); color: #fff; border: none;
+      background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+      color: #fff; border: none;
       border-radius: var(--radius-lg); cursor: pointer; text-decoration: none;
       margin: 0 auto; transition: all 0.2s;
       box-shadow: 0 4px 14px rgba(88,101,242,0.35);
     }
-    .landing-cta:hover { background: var(--btn-primary-hover); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(88,101,242,0.4); }
+    .landing-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(88,101,242,0.45); }
     .landing-features { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 2.5rem; }
     .landing-features span {
       padding: 0.5rem 1rem; background: var(--card-bg);
       color: var(--text-muted); border-radius: 999px; font-size: 0.85rem;
       border: 1px solid var(--card-border); font-weight: 500;
+      transition: all 0.2s;
     }
-    .landing-blob { width: 120px; height: 120px; margin: 0 auto 1.5rem; border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%); opacity: 0.85; animation: blob 8s ease-in-out infinite; }
-    [data-theme="dark"] .landing-blob { background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%); opacity: 0.7; }
-    @keyframes blob { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; transform: rotate(0deg); } 50% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(180deg); } }
+    .landing-features span:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px var(--accent-glow); }
+    /* Landing visual */
+    .landing-visual { width: 140px; height: 140px; margin: 0 auto 2rem; position: relative; }
+    .landing-visual .orbit { position: absolute; inset: 0; border-radius: 50%; border: 2px dashed var(--border); animation: orbit-spin 20s linear infinite; }
+    .landing-visual .orbit:nth-child(2) { inset: 15px; animation-duration: 14s; animation-direction: reverse; border-style: dotted; }
+    .landing-visual .core {
+      position: absolute; inset: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem; box-shadow: 0 8px 32px rgba(88,101,242,0.3);
+    }
+    .landing-visual .dot {
+      position: absolute; width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+    }
+    .landing-visual .dot:nth-child(4) { top: -5px; left: 50%; transform: translateX(-50%); }
+    .landing-visual .dot:nth-child(5) { bottom: 10px; right: -2px; background: var(--gradient-start); }
+    .landing-visual .dot:nth-child(6) { bottom: -2px; left: 25%; background: var(--success); width: 8px; height: 8px; }
+    @keyframes orbit-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     /* Auth pages */
     .auth-page { max-width: 400px; margin: 0 auto; padding-top: 3rem; }
     .auth-page h1 { text-align: center; }
@@ -195,43 +239,60 @@
     .auth-page .discord-btn:hover { background: #4752c4; }
     /* App header */
     .app-header { margin-bottom: 1.25rem; }
-    .app-header h1 { margin-bottom: 0.15rem; }
+    .app-header h1 { margin-bottom: 0.15rem; display: flex; align-items: center; gap: 0.4rem; }
     .app-meta { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .app-meta a { color: var(--accent); text-decoration: none; font-weight: 500; }
     .app-meta a:hover { text-decoration: underline; }
+    /* Leaderboard rank styling */
+    .lb-rank { font-weight: 700; min-width: 2rem; display: inline-block; }
+    .lb-rank.gold { color: #f59e0b; }
+    .lb-rank.silver { color: #9ca3af; }
+    .lb-rank.bronze { color: #b45309; }
   </style>
 </head>
 <body>
   <div id="landingPanel" class="landing-wrap">
     <header class="landing-header">
-      <a href="#" id="landingLogo" class="landing-logo">✨ Discord Scheduler</a>
+      <a href="#" id="landingLogo" class="landing-logo">
+        <span style="font-size: 1.3rem;">&#10024;</span> Little Helper
+      </a>
       <div class="landing-auth">
         <a href="#" id="landingLoginBtn" class="btn-outline">Log in</a>
         <a href="#" id="landingRegisterBtn" class="btn-primary">Register</a>
       </div>
     </header>
     <main class="landing-hero">
-      <div class="landing-blob" aria-hidden="true"></div>
-      <h1>Schedule messages with a smile</h1>
-      <p>Send messages to your Discord server on a schedule. Recurring posts, reminders, or random fun—all from one cozy place.</p>
-      <a href="#" id="landingGetStartedBtn" class="landing-cta">Get started</a>
+      <div class="landing-visual" aria-hidden="true">
+        <div class="orbit"></div>
+        <div class="orbit"></div>
+        <div class="core">&#129302;</div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <h1>Your server's<br><span class="gradient-text">Little Helper</span></h1>
+      <p>Schedule messages, manage your economy, moderate with ease, and keep your Discord server running smoothly -- all from one place.</p>
+      <a href="#" id="landingGetStartedBtn" class="landing-cta">Get started &#8594;</a>
       <div class="landing-features">
-        <span>📅 Recurring schedules</span>
-        <span>💾 Saved templates</span>
-        <span>🔗 Link Discord later</span>
+        <span>&#128197; Scheduled messages</span>
+        <span>&#128176; Economy system</span>
+        <span>&#9878;&#65039; Jail moderation</span>
+        <span>&#128190; Saved templates</span>
+        <span>&#9889; Custom commands</span>
+        <span>&#128279; Discord OAuth</span>
       </div>
     </main>
   </div>
 
   <div id="loginPage" class="auth-page" style="display: none;">
-    <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLandingFromLogin" class="muted" style="font-size: 0.875rem; text-decoration: none;">← Back to home</a></p>
+    <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLandingFromLogin" class="muted" style="font-size: 0.875rem; text-decoration: none;">&#8592; Back to home</a></p>
     <h1>Welcome back</h1>
-    <p class="muted" style="margin-bottom: 1rem;">Log in with your email or Discord (if you’ve already linked it).</p>
+    <p class="muted" style="margin-bottom: 1rem;">Log in with your email or Discord (if you've already linked it).</p>
     <form id="loginForm" class="section" style="margin-bottom: 1rem;" autocomplete="on">
       <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required>
       <label for="loginPassword">Password</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
+      <input type="password" id="loginPassword" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" autocomplete="current-password" required>
       <button type="submit" id="loginBtn" style="width: 100%;">Log in</button>
       <p id="loginStatus" class="muted" style="font-size: 0.875rem; margin-top: 0.25rem;"></p>
     </form>
@@ -241,19 +302,19 @@
     </div>
     <p id="redirectUriHint" class="muted" style="margin-top: 0.75rem; font-size: 0.8rem; display: none;"></p>
     <a id="redirectUriLink" href="#" target="_blank" rel="noopener" style="font-size: 0.8rem; word-break: break-all; display: none;"></a>
-    <p class="muted" style="margin-top: 1rem; font-size: 0.875rem;">Don’t have an account? <a href="#" id="goToRegisterFromLogin" style="color: var(--btn-primary);">Register</a></p>
+    <p class="muted" style="margin-top: 1rem; font-size: 0.875rem;">Don't have an account? <a href="#" id="goToRegisterFromLogin" style="color: var(--btn-primary);">Register</a></p>
     <p style="margin-top: 0.5rem;"><button type="button" id="darkModeBtnLogin" class="btn-sm btn-secondary">Dark mode</button></p>
   </div>
 
   <div id="registerPage" class="auth-page" style="display: none;">
-    <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLandingFromRegister" class="muted" style="font-size: 0.875rem; text-decoration: none;">← Back to home</a></p>
+    <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLandingFromRegister" class="muted" style="font-size: 0.875rem; text-decoration: none;">&#8592; Back to home</a></p>
     <h1>Create an account</h1>
     <p class="muted" style="margin-bottom: 1rem;">You can link your Discord account after signing up.</p>
     <form id="registerForm" class="section" style="margin-bottom: 1rem;" autocomplete="on">
       <label for="registerEmail">Email</label>
       <input type="email" id="registerEmail" placeholder="you@example.com" autocomplete="email" required>
       <label for="registerPassword">Password (min 6 characters)</label>
-      <input type="password" id="registerPassword" placeholder="••••••••" autocomplete="new-password" required minlength="6">
+      <input type="password" id="registerPassword" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" autocomplete="new-password" required minlength="6">
       <button type="submit" id="registerBtn" style="width: 100%;">Create account</button>
       <p id="registerStatus" class="muted" style="font-size: 0.875rem; margin-top: 0.25rem;"></p>
     </form>
@@ -262,7 +323,7 @@
   </div>
 
   <div id="verifyPage" class="auth-page" style="display: none;">
-    <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLoginFromVerify" class="muted" style="font-size: 0.875rem; text-decoration: none;">← Back to login</a></p>
+    <p style="margin-bottom: 0.75rem;"><a href="#" id="backToLoginFromVerify" class="muted" style="font-size: 0.875rem; text-decoration: none;">&#8592; Back to login</a></p>
     <h1>Verify your email</h1>
     <p class="muted" style="margin-bottom: 1rem;">We sent a 6-digit code to <strong id="verifyEmailDisplay"></strong>. Enter it below.</p>
     <form id="verifyForm" class="section" style="margin-bottom: 1rem;">
@@ -278,7 +339,7 @@
   <div id="appPanel" style="display: none;">
   <div class="app-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
     <div>
-      <h1 style="margin: 0;">Discord Bot Panel</h1>
+      <h1 style="margin: 0;"><span style="font-size: 1.3rem;">&#10024;</span> Little Helper</h1>
       <div class="app-meta" style="margin-top: 0.25rem;">
         <a href="#" id="logoutLink">Log out</a>
         <span id="adminBadge" style="display: none; background: var(--accent-soft); color: var(--accent); padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">Admin</span>
@@ -370,9 +431,9 @@
     <div class="section">
       <h2>Custom commands</h2>
       <p class="muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">Users type <strong id="customCommandPrefix">!</strong><strong>command</strong> in chat (e.g. <code>!hug @max</code>). The bot replies with your template. Use placeholders: <code>{author}</code> (who ran it), <code>{target}</code> (first @mention), <code>{author_username}</code>, <code>{target_username}</code>, <code>{args}</code> (rest of message).</p>
-      <p class="info-box"><strong>If nothing happens when you type !command:</strong> In the <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a> open your app → <strong>Bot</strong> → under <strong>Privileged Gateway Intents</strong> turn on <strong>MESSAGE CONTENT INTENT</strong>, then save. Restart the bot if it was already running.</p>
+      <p class="info-box"><strong>If nothing happens when you type !command:</strong> In the <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a> open your app &#8594; <strong>Bot</strong> &#8594; under <strong>Privileged Gateway Intents</strong> turn on <strong>MESSAGE CONTENT INTENT</strong>, then save. Restart the bot if it was already running.</p>
       <label for="cmdGuildSelect">Server</label>
-      <select id="cmdGuildSelect"><option value="">— Select a server —</option></select>
+      <select id="cmdGuildSelect"><option value="">&#8212; Select a server &#8212;</option></select>
       <div id="cmdFormArea" style="display:none;">
         <label for="customCommandName">Command name</label>
         <input type="text" id="customCommandName" placeholder="e.g. hug">
@@ -429,6 +490,7 @@
         <strong>Auto-role:</strong> New members automatically get the member role.
       </div>
       <h3>Configured servers</h3>
+      <p id="jailFilterNote" class="muted" style="font-size: 0.82rem; margin-bottom: 0.5rem; display: none;"></p>
       <ul id="jailConfigList"></ul>
       <p id="jailDebugInfo" class="muted" style="font-size: 0.75rem; margin-top: 0.5rem;"></p>
     </div>
@@ -437,7 +499,7 @@
   <div id="pageLogs" class="page">
     <div id="deletedLogSection" class="section">
       <h2>Deleted message logging</h2>
-      <p class="muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">The bot monitors <strong>every server it’s in</strong> for deleted messages. Logs are sent only to channels where someone ran <strong><code>/log-deletes here</code></strong>. Run <code>/log-deletes off</code> in a channel to stop.</p>
+      <p class="muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">The bot monitors <strong>every server it's in</strong> for deleted messages. Logs are sent only to channels where someone ran <strong><code>/log-deletes here</code></strong>. Run <code>/log-deletes off</code> in a channel to stop.</p>
       <p style="font-size: 0.875rem; margin-bottom: 0.5rem;">Currently sending logs to:</p>
       <ul id="deletedLogChannelsList"></ul>
     </div>
@@ -585,7 +647,7 @@
       if (!r.ok) { listEl.innerHTML = "<li class=\"muted\">Could not load</li>"; return; }
       const { servers } = await r.json();
       if (servers.length === 0) { listEl.innerHTML = "<li class=\"muted\">Bot is not in any servers</li>"; return; }
-      listEl.innerHTML = servers.map(s => `<li>${escapeHtml(s.name)} <span class="muted">(${s.memberCount} members)</span></li>`).join("");
+      listEl.innerHTML = servers.map(s => `<li><strong>${escapeHtml(s.name)}</strong> <span class="muted" style="font-size: 0.82rem;">${s.memberCount} members</span></li>`).join("");
     }
     function showLanding() {
       appPanel.style.display = "none";
@@ -655,7 +717,7 @@
         return;
       }
       if (r.ok) {
-        statusEl.textContent = "Account created. Loading…";
+        statusEl.textContent = "Account created. Loading\u2026";
         statusEl.className = "success";
         await checkAuth();
         showApp();
@@ -696,7 +758,7 @@
       const r = await fetch("/api/auth/verify", fetchOpts({ method: "POST", headers: headers(), body: JSON.stringify({ email: pendingVerifyEmail, code }) }));
       const data = await r.json().catch(() => ({}));
       if (r.ok) {
-        statusEl.textContent = "Verified! Loading…";
+        statusEl.textContent = "Verified! Loading\u2026";
         statusEl.className = "success";
         await checkAuth();
         showApp();
@@ -709,12 +771,12 @@
     document.getElementById("resendCodeLink").addEventListener("click", async (e) => {
       e.preventDefault();
       const statusEl = document.getElementById("verifyStatus");
-      statusEl.textContent = "Sending…";
+      statusEl.textContent = "Sending\u2026";
       statusEl.className = "muted";
       const r = await fetch("/api/auth/resend-code", fetchOpts({ method: "POST", headers: headers(), body: JSON.stringify({ email: pendingVerifyEmail }) }));
       const data = await r.json().catch(() => ({}));
       if (r.ok && data.alreadyVerified) {
-        statusEl.textContent = "Already verified! Redirecting…";
+        statusEl.textContent = "Already verified! Redirecting\u2026";
         statusEl.className = "success";
         await checkAuth();
         showApp();
@@ -981,7 +1043,7 @@
       const gid = guildSelect.value;
       if (!gid) { formArea.style.display = "none"; return; }
       formArea.style.display = "";
-      listEl.innerHTML = "<li class=\"muted\">Loading…</li>";
+      listEl.innerHTML = "<li class=\"muted\">Loading\u2026</li>";
       const r = await fetch("/api/custom-commands?guildId=" + encodeURIComponent(gid), fetchOpts({ headers: headers() }));
       if (!r.ok) { listEl.innerHTML = "<li class=\"muted\">Could not load</li>"; return; }
       const data = await r.json().catch(() => ({}));
@@ -991,7 +1053,7 @@
         listEl.innerHTML = "<li class=\"muted\">No custom commands for this server. Add one above.</li>";
         return;
       }
-      listEl.innerHTML = commands.map(c => `<li><code>${escapeHtml(prefix + c.name)}</code> → ${escapeHtml(c.template)} <button type="button" class="btn-sm danger" data-cmd-name="${escapeHtml(c.name)}" data-action="delete-custom-cmd">Delete</button></li>`).join("");
+      listEl.innerHTML = commands.map(c => `<li><code>${escapeHtml(prefix + c.name)}</code> <span style="margin: 0 0.35rem; color: var(--text-muted);">\u2192</span> ${escapeHtml(c.template)} <button type="button" class="btn-sm danger" data-cmd-name="${escapeHtml(c.name)}" data-action="delete-custom-cmd">Delete</button></li>`).join("");
       listEl.querySelectorAll("[data-action=delete-custom-cmd]").forEach(btn => {
         btn.addEventListener("click", async () => {
           const name = btn.dataset.cmdName;
@@ -1097,19 +1159,19 @@
           jobsList.innerHTML = "";
           for (const j of (info.jobs || [])) {
             const li = document.createElement("li");
-            li.innerHTML = `<strong>${esc(j.name)}</strong> — ${j.pay[0]}-${j.pay[1]} coins (cooldown: ${Math.round(j.cooldownMs/1000)}s, level ${j.requiredLevel})`;
+            li.innerHTML = `<span><strong>${esc(j.name)}</strong><br><span class="muted" style="font-size: 0.82rem;">${j.pay[0]}\u2013${j.pay[1]} coins &middot; cooldown: ${Math.round(j.cooldownMs/1000)}s &middot; level ${j.requiredLevel}</span></span>`;
             jobsList.appendChild(li);
           }
           shopList.innerHTML = "";
           for (const item of (info.shop || [])) {
             const li = document.createElement("li");
-            li.innerHTML = `<strong>${esc(item.name)}</strong> — ${item.price} coins: ${esc(item.description)}`;
+            li.innerHTML = `<span><strong>${esc(item.name)}</strong> &mdash; ${item.price.toLocaleString()} coins<br><span class="muted" style="font-size: 0.82rem;">${esc(item.description)}</span></span>`;
             shopList.appendChild(li);
           }
           questsList.innerHTML = "";
           for (const q of (info.quests || [])) {
             const li = document.createElement("li");
-            li.innerHTML = `<strong>${esc(q.description)}</strong> — reward: ${q.reward} coins`;
+            li.innerHTML = `<span><strong>${esc(q.description)}</strong><br><span class="muted" style="font-size: 0.82rem;">Reward: ${q.reward.toLocaleString()} coins</span></span>`;
             questsList.appendChild(li);
           }
         } else {
@@ -1145,9 +1207,14 @@
             lbList.innerHTML = "<li><span class=\"muted\">No one has earned coins yet.</span></li>";
             return;
           }
-          for (const entry of data.leaderboard) {
+          const medals = ["\ud83e\udd47", "\ud83e\udd48", "\ud83e\udd49"];
+          const rankClasses = ["gold", "silver", "bronze"];
+          for (let i = 0; i < data.leaderboard.length; i++) {
+            const entry = data.leaderboard[i];
             const li = document.createElement("li");
-            li.innerHTML = `<strong>${esc(entry.username)}</strong> — ${entry.total.toLocaleString()} coins`;
+            const prefix = medals[i] || `${i + 1}.`;
+            const cls = rankClasses[i] || "";
+            li.innerHTML = `<span><span class="lb-rank ${cls}">${prefix}</span> <strong>${esc(entry.username)}</strong></span> <span style="font-weight: 600; color: var(--accent);">${entry.total.toLocaleString()} coins</span>`;
             lbList.appendChild(li);
           }
         } catch (e) {
@@ -1160,8 +1227,11 @@
 
     async function loadJailConfigPage() {
       const listEl = document.getElementById("jailConfigList");
+      const filterNote = document.getElementById("jailFilterNote");
       if (!listEl) return;
       listEl.innerHTML = "<li><span class=\"muted\">Loading jail config...</span></li>";
+      if (filterNote) filterNote.style.display = "none";
+
       try {
         const r = await fetch("/api/jail-config", fetchOpts({ headers: headers() }));
         if (!r.ok) {
@@ -1170,12 +1240,44 @@
           return;
         }
         const data = await r.json();
-        if (!data.configs || data.configs.length === 0) {
+        let configs = data.configs || [];
+
+        // Task 4: For non-admin users, filter to only show servers they're in
+        if (!window._isAdmin) {
+          if (!window._user?.discordId) {
+            // User has no Discord linked
+            listEl.innerHTML = "";
+            if (filterNote) {
+              filterNote.textContent = "Link your Discord account to see your servers' jail configs.";
+              filterNote.style.display = "block";
+            }
+            if (configs.length === 0) {
+              listEl.innerHTML = "<li><span class=\"muted\">No servers configured yet. Run /jail-setup in Discord.</span></li>";
+            }
+            // Show nothing for unlinked users
+            return;
+          }
+          // Fetch user's guilds and filter
+          try {
+            const ugr = await fetch("/api/user/guilds", fetchOpts({ headers: headers() }));
+            if (ugr.ok) {
+              const ugData = await ugr.json();
+              const userGuildIds = new Set((ugData.guilds || []).map(g => g.id));
+              configs = configs.filter(c => userGuildIds.has(c.guildId));
+              if (filterNote) {
+                filterNote.textContent = "Showing jail configs for servers you're in.";
+                filterNote.style.display = "block";
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (configs.length === 0) {
           listEl.innerHTML = "<li><span class=\"muted\">No servers configured yet. Run <code>/jail-setup</code> in Discord.</span></li>";
           return;
         }
         listEl.innerHTML = "";
-        for (const c of data.configs) {
+        for (const c of configs) {
           const li = document.createElement("li");
           li.style.cssText = "flex-direction: column; align-items: flex-start;";
           const allowedText = c.allowedRoleNames && c.allowedRoleNames.length > 0
@@ -1237,8 +1339,8 @@
           li.style.cssText = "flex-direction: column; align-items: flex-start;";
           const infoDiv = document.createElement("div");
           const verifiedBadge = u.verified
-            ? '<span style="color: var(--success); font-size: 0.75rem; margin-left: 0.25rem;">Verified</span>'
-            : '<span style="color: var(--error); font-size: 0.75rem; margin-left: 0.25rem;">Unverified</span>';
+            ? '<span style="color: var(--success); font-size: 0.75rem; margin-left: 0.25rem; background: rgba(16,185,129,0.1); padding: 0.1rem 0.4rem; border-radius: 999px;">Verified</span>'
+            : '<span style="color: var(--error); font-size: 0.75rem; margin-left: 0.25rem; background: rgba(239,68,68,0.1); padding: 0.1rem 0.4rem; border-radius: 999px;">Unverified</span>';
           const discordInfo = u.discordUsername
             ? `<br><span class="muted">Discord:</span> ${escapeHtml(u.discordUsername)} <span class="muted">(${escapeHtml(u.discordId || "")})</span>`
             : '<br><span class="muted">Discord: not linked</span>';
@@ -1279,7 +1381,7 @@
         return;
       }
       listEl.innerHTML = channels.map(c => {
-        const label = [c.guildName, c.channelName ? "#" + c.channelName : ""].filter(Boolean).join(" › ") || c.channelId;
+        const label = [c.guildName, c.channelName ? "#" + c.channelName : ""].filter(Boolean).join(" \u203a ") || c.channelId;
         const removeBtn = window._isAdmin ? ` <button type="button" class="btn-sm danger" data-channel-id="${escapeHtml(c.channelId)}" data-action="remove-log-channel">Remove</button>` : "";
         return `<li>${escapeHtml(label)}${removeBtn}</li>`;
       }).join("");
@@ -1372,7 +1474,7 @@
         if (!iso) return;
         const diff = new Date(iso) - new Date();
         if (diff <= 0) {
-          el.textContent = "Sending…";
+          el.textContent = "Sending\u2026";
           return;
         }
         const s = Math.floor(diff / 1000) % 60;
@@ -1392,15 +1494,15 @@
       const r = await fetch("/api/schedules", fetchOpts({ headers: headers() }));
       if (!r.ok) { scheduleList.innerHTML = "<li>Could not load schedules</li>"; return; }
       const { schedules } = await r.json();
-      if (schedules.length === 0) { scheduleList.innerHTML = "<li>No scheduled messages</li>"; return; }
+      if (schedules.length === 0) { scheduleList.innerHTML = "<li class=\"muted\">No scheduled messages</li>"; return; }
       scheduleList.innerHTML = schedules.map(s => {
-        const where = [s.serverName, s.channelName ? "#" + s.channelName : ""].filter(Boolean).join(" › ") || "Unknown channel";
+        const where = [s.serverName, s.channelName ? "#" + s.channelName : ""].filter(Boolean).join(" \u203a ") || "Unknown channel";
         const pausedBadge = s.paused ? ' <span class="muted" style="font-weight: normal;">(Paused)</span>' : "";
         const nextRunHtml = s.paused
           ? '<span class="next-run muted">Paused</span>'
           : s.nextRunAt
             ? `<span class="next-run" data-next-run="${escapeHtml(s.nextRunAt)}" data-next-run-formatted="${escapeHtml(formatNextRun(s.nextRunAt))}"></span>`
-            : '<span class="next-run muted">Next: —</span>';
+            : '<span class="next-run muted">Next: \u2014</span>';
         return `
         <li>
           <span>
@@ -1489,7 +1591,7 @@
       const redirectData = await redirectRes.json().catch(() => ({}));
       const hintEl = document.getElementById("redirectUriHint");
       if (hintEl && redirectData.redirectUri) {
-        hintEl.textContent = "In Discord Developer Portal → OAuth2 → Redirects, add this exact URL:";
+        hintEl.textContent = "In Discord Developer Portal \u2192 OAuth2 \u2192 Redirects, add this exact URL:";
         hintEl.style.display = "block";
         const link = document.getElementById("redirectUriLink");
         if (link) { link.href = redirectData.redirectUri; link.textContent = redirectData.redirectUri; link.style.display = "block"; }

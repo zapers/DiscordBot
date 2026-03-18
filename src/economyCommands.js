@@ -34,7 +34,7 @@ const WORK_MESSAGES = {
   ],
   chef: [
     "You cooked a 5-course meal and earned {amount} in tips!",
-    "Your soufflé was perfect. Earned {amount}.",
+    "Your souffl\u00e9 was perfect. Earned {amount}.",
   ],
   teacher: [
     "You taught a class of students and earned {amount}.",
@@ -68,7 +68,7 @@ const ROB_FAIL = [
   "You tripped while running away and lost {fine}.",
 ];
 
-const SLOT_SYMBOLS = ["🍒", "🍋", "🍊", "🍇", "💎", "7️⃣", "🔔"];
+const SLOT_SYMBOLS = ["\ud83c\udf52", "\ud83c\udf4b", "\ud83c\udf4a", "\ud83c\udf47", "\ud83d\udc8e", "7\ufe0f\u20e3", "\ud83d\udd14"];
 
 /**
  * Handle an economy command. Returns true if it was an economy command, false otherwise.
@@ -82,14 +82,25 @@ export async function handleEconomyCommand(message, commandName, args) {
   const userId = message.author.id;
 
   const send = (content) => message.channel.send({ content }).catch(() => {});
+  const sendEmbed = (embed) => message.channel.send({ embeds: [embed] }).catch(() => {});
 
   switch (commandName) {
     case "balance":
     case "bal": {
       const target = message.mentions?.users?.first() || message.author;
       const u = getUser(guildId, target.id);
-      const name = target.id === userId ? "Your" : `<@${target.id}>'s`;
-      return send(`${name} balance:\n💰 Wallet: ${formatCoins(u.wallet)}\n🏦 Bank: ${formatCoins(u.bank)} / ${formatCoins(u.bankLimit)}`), true;
+      const name = target.id === userId ? "Your" : `${target.username}'s`;
+      const total = u.wallet + u.bank;
+      return sendEmbed({
+        color: 0x57f287,
+        title: `\ud83d\udcb0  ${name} Balance`,
+        fields: [
+          { name: "Wallet", value: formatCoins(u.wallet), inline: true },
+          { name: "Bank", value: `${formatCoins(u.bank)} / ${formatCoins(u.bankLimit)}`, inline: true },
+          { name: "Net Worth", value: formatCoins(total), inline: true },
+        ],
+        footer: { text: "Use !dep / !with to manage your bank" },
+      }), true;
     }
 
     case "deposit":
@@ -99,10 +110,10 @@ export async function handleEconomyCommand(message, commandName, args) {
       if (!amount || amount <= 0) return send("Usage: `!deposit <amount|all>`"), true;
       if (amount > u.wallet) return send(`You only have ${formatCoins(u.wallet)} in your wallet.`), true;
       const space = u.bankLimit - u.bank;
-      if (space <= 0) return send("Your bank is full! Buy a **Bank Upgrade** from the `!shop`."), true;
+      if (space <= 0) return send("\ud83c\udfe6 Your bank is full! Buy a **Bank Upgrade** from the `!shop`."), true;
       const actual = Math.min(amount, space);
       updateUser(guildId, userId, (u) => { u.wallet -= actual; u.bank += actual; });
-      return send(`Deposited ${formatCoins(actual)} into your bank.`), true;
+      return send(`\ud83c\udfe6 Deposited ${formatCoins(actual)} into your bank.`), true;
     }
 
     case "withdraw":
@@ -112,38 +123,43 @@ export async function handleEconomyCommand(message, commandName, args) {
       if (!amount || amount <= 0) return send("Usage: `!withdraw <amount|all>`"), true;
       if (amount > u.bank) return send(`You only have ${formatCoins(u.bank)} in your bank.`), true;
       updateUser(guildId, userId, (u) => { u.wallet += amount; u.bank -= amount; });
-      return send(`Withdrew ${formatCoins(amount)} from your bank.`), true;
+      return send(`\ud83d\udcb5 Withdrew ${formatCoins(amount)} from your bank.`), true;
     }
 
     case "daily":
     case "d": {
       const cd = getCooldownRemaining(guildId, userId, "daily");
-      if (cd > 0) return send(`You already claimed your daily! Come back in **${formatCooldown(cd)}**.`), true;
+      if (cd > 0) return send(`\u23f0 You already claimed your daily! Come back in **${formatCooldown(cd)}**.`), true;
       const amount = rand(100, 300);
       addMoney(guildId, userId, amount);
       setCooldown(guildId, userId, "daily", 24 * 60 * 60 * 1000);
-      return send(`You claimed your daily reward of ${formatCoins(amount)}!`), true;
+      return sendEmbed({
+        color: 0xfee75c,
+        title: "\ud83c\udf1f  Daily Reward Claimed!",
+        description: `You received ${formatCoins(amount)}!`,
+        footer: { text: "Come back in 24 hours for your next reward" },
+      }), true;
     }
 
     case "work":
     case "w": {
       const u = getUser(guildId, userId);
-      if (!u.job) return send("You don't have a job! Use `!jobs` to see available jobs and `!apply <job>` to get one."), true;
+      if (!u.job) return send("\u274c You don't have a job! Use `!jobs` to see available jobs and `!apply <job>` to get one."), true;
       const job = JOBS.find((j) => j.id === u.job);
-      if (!job) return send("Your job doesn't exist anymore. Use `!apply <job>` to get a new one."), true;
+      if (!job) return send("\u274c Your job doesn't exist anymore. Use `!apply <job>` to get a new one."), true;
       const cd = getCooldownRemaining(guildId, userId, "work");
-      if (cd > 0) return send(`You're tired! You can work again in **${formatCooldown(cd)}**.`), true;
+      if (cd > 0) return send(`\u23f0 You're tired! You can work again in **${formatCooldown(cd)}**.`), true;
       const amount = rand(job.pay[0], job.pay[1]);
       addMoney(guildId, userId, amount);
       setCooldown(guildId, userId, "work", job.cooldownMs);
       updateUser(guildId, userId, (u) => { u.stats.timesWorked++; });
       const msgs = WORK_MESSAGES[job.id] || [`You worked as a ${job.name} and earned {amount}.`];
       const msg = pick(msgs).replace("{amount}", formatCoins(amount));
-      let text = `💼 ${msg}`;
+      let text = `\ud83d\udcbc ${msg}`;
       const questInfo = checkQuestProgress(guildId, userId);
       if (questInfo && questInfo.done) {
         const completed = completeQuest(guildId, userId);
-        if (completed) text += `\n🎉 **Quest complete!** "${completed.description}" — bonus ${formatCoins(completed.reward)}!`;
+        if (completed) text += `\n\ud83c\udf89 **Quest complete!** "${completed.description}" \u2014 bonus ${formatCoins(completed.reward)}!`;
       }
       return send(text), true;
     }
@@ -152,27 +168,36 @@ export async function handleEconomyCommand(message, commandName, args) {
     case "j": {
       const level = getJobLevel(guildId, userId);
       const u = getUser(guildId, userId);
-      let text = `**Available Jobs** (your level: **${level}**)\n`;
-      for (const j of JOBS) {
+      const fields = JOBS.map((j) => {
         const locked = j.requiredLevel > level;
-        const current = u.job === j.id ? " ← your job" : "";
-        const lock = locked ? "🔒 " : "";
-        text += `${lock}**${j.name}** — ${j.pay[0]}-${j.pay[1]} coins (cd: ${formatCooldown(j.cooldownMs)})${locked ? ` [level ${j.requiredLevel}]` : ""}${current}\n`;
-      }
-      text += `\nUse \`!apply <job name>\` to take a job. Level up by working (1 level per 5 works).`;
-      return send(text), true;
+        const current = u.job === j.id ? " \u2190 *your job*" : "";
+        const lock = locked ? "\ud83d\udd12 " : "\u2705 ";
+        const levelReq = locked ? ` *(requires level ${j.requiredLevel})*` : "";
+        return {
+          name: `${lock}${j.name}${current}`,
+          value: `${j.pay[0]}\u2013${j.pay[1]} coins \u00b7 cooldown: ${formatCooldown(j.cooldownMs)}${levelReq}`,
+          inline: false,
+        };
+      });
+      return sendEmbed({
+        color: 0x5865f2,
+        title: "\ud83d\udcbc  Available Jobs",
+        description: `Your current level: **${level}**\nLevel up by working (1 level per 5 works).`,
+        fields,
+        footer: { text: "Use !apply <job name> to take a job" },
+      }), true;
     }
 
     case "apply":
     case "ap": {
       const jobName = args.toLowerCase().trim();
-      if (!jobName) return send("Usage: `!apply <job name>` — use `!jobs` to see available jobs."), true;
+      if (!jobName) return send("Usage: `!apply <job name>` \u2014 use `!jobs` to see available jobs."), true;
       const job = JOBS.find((j) => j.id === jobName || j.name.toLowerCase() === jobName);
-      if (!job) return send(`Job "${jobName}" not found. Use \`!jobs\` to see available jobs.`), true;
+      if (!job) return send(`\u274c Job "${jobName}" not found. Use \`!jobs\` to see available jobs.`), true;
       const level = getJobLevel(guildId, userId);
-      if (job.requiredLevel > level) return send(`You need level **${job.requiredLevel}** to apply as a **${job.name}**. You're level **${level}**.`), true;
+      if (job.requiredLevel > level) return send(`\ud83d\udd12 You need level **${job.requiredLevel}** to apply as a **${job.name}**. You're level **${level}**.`), true;
       updateUser(guildId, userId, (u) => { u.job = job.id; });
-      return send(`You are now working as a **${job.name}**! Use \`!work\` to start earning.`), true;
+      return send(`\u2705 You are now working as a **${job.name}**! Use \`!work\` to start earning.`), true;
     }
 
     case "quest":
@@ -180,20 +205,20 @@ export async function handleEconomyCommand(message, commandName, args) {
       const u = getUser(guildId, userId);
       if (!u.quest) {
         const cd = getCooldownRemaining(guildId, userId, "quest");
-        if (cd > 0) return send(`You can get a new quest in **${formatCooldown(cd)}**.`), true;
+        if (cd > 0) return send(`\u23f0 You can get a new quest in **${formatCooldown(cd)}**.`), true;
         assignRandomQuest(guildId, userId);
         setCooldown(guildId, userId, "quest", 5 * 60 * 1000);
         const updated = getUser(guildId, userId);
         const q = QUESTS.find((q) => q.id === updated.quest?.id);
-        return send(`📜 **New Quest:** ${q?.description || "???"}\nReward: ${formatCoins(q?.reward || 0)}\nProgress: 0/${q?.target || "?"}\nProgress updates automatically as you play. Use \`!quest\` to check.`), true;
+        return send(`\ud83d\udcdc **New Quest:** ${q?.description || "???"}\nReward: ${formatCoins(q?.reward || 0)}\nProgress: 0/${q?.target || "?"}\nProgress updates automatically as you play. Use \`!quest\` to check.`), true;
       }
       const info = checkQuestProgress(guildId, userId);
       if (!info) return send("Something went wrong with your quest. Use `!quest abandon` to get a new one."), true;
       if (info.done) {
         const completed = completeQuest(guildId, userId);
-        if (completed) return send(`🎉 **Quest complete!** "${completed.description}" — you earned ${formatCoins(completed.reward)}!`), true;
+        if (completed) return send(`\ud83c\udf89 **Quest complete!** "${completed.description}" \u2014 you earned ${formatCoins(completed.reward)}!`), true;
       }
-      return send(`📜 **Current Quest:** ${info.quest.description}\nReward: ${formatCoins(info.quest.reward)}\nProgress: **${info.current}**/${info.target}`), true;
+      return send(`\ud83d\udcdc **Current Quest:** ${info.quest.description}\nReward: ${formatCoins(info.quest.reward)}\nProgress: **${info.current}**/${info.target}`), true;
     }
 
     case "coinflip":
@@ -209,11 +234,11 @@ export async function handleEconomyCommand(message, commandName, args) {
       if (won) {
         addMoney(guildId, userId, amount);
         updateUser(guildId, userId, (u) => { u.stats.gamblingWon++; });
-        return send(`🪙 The coin lands on **heads**! You won ${formatCoins(amount)}!${hasCharm ? " 🍀 Lucky charm used!" : ""}`), true;
+        return send(`\ud83e\ude99 The coin lands on **heads**! You won ${formatCoins(amount)}!${hasCharm ? " \ud83c\udf40 Lucky charm used!" : ""}`), true;
       } else {
         removeMoney(guildId, userId, amount);
         updateUser(guildId, userId, (u) => { u.stats.gamblingLost++; });
-        return send(`🪙 The coin lands on **tails**. You lost ${formatCoins(amount)}.${hasCharm ? " 🍀 Lucky charm used but no luck!" : ""}`), true;
+        return send(`\ud83e\ude99 The coin lands on **tails**. You lost ${formatCoins(amount)}.${hasCharm ? " \ud83c\udf40 Lucky charm used but no luck!" : ""}`), true;
       }
     }
 
@@ -228,7 +253,7 @@ export async function handleEconomyCommand(message, commandName, args) {
       const s1 = pick(SLOT_SYMBOLS), s2 = pick(SLOT_SYMBOLS), s3 = pick(SLOT_SYMBOLS);
       let multiplier = 0;
       if (s1 === s2 && s2 === s3) {
-        multiplier = s1 === "7️⃣" ? 10 : s1 === "💎" ? 7 : 5;
+        multiplier = s1 === "7\ufe0f\u20e3" ? 10 : s1 === "\ud83d\udc8e" ? 7 : 5;
       } else if (s1 === s2 || s2 === s3 || s1 === s3) {
         multiplier = 2;
       }
@@ -237,10 +262,10 @@ export async function handleEconomyCommand(message, commandName, args) {
         const winnings = amount * multiplier;
         addMoney(guildId, userId, winnings);
         updateUser(guildId, userId, (u) => { u.stats.gamblingWon++; });
-        return send(`🎰 ${display}\nYou won ${formatCoins(winnings)}! (${multiplier}x)`), true;
+        return send(`\ud83c\udfb0 ${display}\nYou won ${formatCoins(winnings)}! (${multiplier}x)`), true;
       } else {
         updateUser(guildId, userId, (u) => { u.stats.gamblingLost++; });
-        return send(`🎰 ${display}\nNo match. You lost ${formatCoins(amount)}.`), true;
+        return send(`\ud83c\udfb0 ${display}\nNo match. You lost ${formatCoins(amount)}.`), true;
       }
     }
 
@@ -292,7 +317,7 @@ export async function handleEconomyCommand(message, commandName, args) {
         result = `Dealer wins. You lost ${formatCoins(amount)}.`;
         updateUser(guildId, userId, (u) => { u.stats.gamblingLost++; });
       }
-      return send(`🃏 **Blackjack**\nYou: ${pDisplay}\nDealer: ${dDisplay}\n${result}`), true;
+      return send(`\ud83c\udccf **Blackjack**\nYou: ${pDisplay}\nDealer: ${dDisplay}\n${result}`), true;
     }
 
     case "rob":
@@ -300,13 +325,13 @@ export async function handleEconomyCommand(message, commandName, args) {
       const target = message.mentions?.users?.first();
       if (!target || target.id === userId) return send("Usage: `!rob @user`"), true;
       const cd = getCooldownRemaining(guildId, userId, "rob");
-      if (cd > 0) return send(`You need to lay low. Try again in **${formatCooldown(cd)}**.`), true;
+      if (cd > 0) return send(`\u23f0 You need to lay low. Try again in **${formatCooldown(cd)}**.`), true;
       const targetUser = getUser(guildId, target.id);
       if (targetUser.wallet < 50) return send(`<@${target.id}> doesn't have enough to rob (need at least 50 in wallet).`), true;
       if (hasItem(guildId, target.id, "padlock")) {
         consumeItem(guildId, target.id, "padlock");
         setCooldown(guildId, userId, "rob", 60_000);
-        return send(`🔒 <@${target.id}>'s padlock stopped you! The padlock broke in the process.`), true;
+        return send(`\ud83d\udd12 <@${target.id}>'s padlock stopped you! The padlock broke in the process.`), true;
       }
       const hasMask = hasItem(guildId, userId, "robbers_mask");
       const successChance = hasMask ? 0.55 : 0.4;
@@ -335,54 +360,73 @@ export async function handleEconomyCommand(message, commandName, args) {
       if (amount > u.wallet) return send(`You only have ${formatCoins(u.wallet)} in your wallet.`), true;
       removeMoney(guildId, userId, amount);
       addMoney(guildId, target.id, amount);
-      return send(`You gave ${formatCoins(amount)} to <@${target.id}>.`), true;
+      return send(`\ud83d\udce8 You gave ${formatCoins(amount)} to <@${target.id}>.`), true;
     }
 
     case "leaderboard":
     case "lb": {
       const lb = getLeaderboard(guildId);
       if (lb.length === 0) return send("No one has any money yet!"), true;
-      let text = "**🏆 Leaderboard**\n";
-      const medals = ["🥇", "🥈", "🥉"];
-      for (let i = 0; i < lb.length; i++) {
-        const prefix = medals[i] || `**${i + 1}.**`;
-        text += `${prefix} <@${lb[i].userId}> — ${formatCoins(lb[i].total)}\n`;
-      }
-      return send(text), true;
+      const medals = ["\ud83e\udd47", "\ud83e\udd48", "\ud83e\udd49"];
+      const lines = lb.map((entry, i) => {
+        const prefix = medals[i] || `\`${String(i + 1).padStart(2, " ")}.\``;
+        return `${prefix} <@${entry.userId}> \u2014 ${formatCoins(entry.total)}`;
+      });
+      return sendEmbed({
+        color: 0xfee75c,
+        title: "\ud83c\udfc6  Leaderboard",
+        description: lines.join("\n"),
+        footer: { text: `Top ${lb.length} richest players` },
+      }), true;
     }
 
     case "shop":
     case "s": {
-      let text = "**🛒 Shop**\n";
-      for (const item of SHOP_ITEMS) {
-        text += `**${item.name}** — ${formatCoins(item.price)}\n  ${item.description}\n  \`!buy ${item.id}\`\n`;
-      }
-      return send(text), true;
+      const fields = SHOP_ITEMS.map((item) => ({
+        name: `${item.name}  \u2014  ${formatCoins(item.price)}`,
+        value: `${item.description}\n\`!buy ${item.id}\``,
+        inline: false,
+      }));
+      return sendEmbed({
+        color: 0xeb459e,
+        title: "\ud83d\uded2  Shop",
+        description: "Buy items to gain an edge! Use `!buy <item>` to purchase.",
+        fields,
+        footer: { text: "Items are consumed on use" },
+      }), true;
     }
 
     case "buy":
     case "b": {
       const itemId = args.toLowerCase().trim().replace(/\s+/g, "_");
-      if (!itemId) return send("Usage: `!buy <item id>` — check `!shop` for items."), true;
+      if (!itemId) return send("Usage: `!buy <item id>` \u2014 check `!shop` for items."), true;
       const result = buyItem(guildId, userId, itemId);
       if (result.error) return send(result.error), true;
-      return send(`You bought **${result.item.name}**!`), true;
+      return send(`\u2705 You bought **${result.item.name}**!`), true;
     }
 
     case "inventory":
     case "inv": {
       const u = getUser(guildId, userId);
-      if (u.inventory.length === 0) return send("Your inventory is empty. Check `!shop` to buy items."), true;
+      if (u.inventory.length === 0) return sendEmbed({
+        color: 0x99aab5,
+        title: "\ud83c\udf92  Inventory",
+        description: "Your inventory is empty.\nCheck `!shop` to buy items!",
+      }), true;
       const counts = {};
       for (const item of u.inventory) {
         counts[item.id] = (counts[item.id] || 0) + 1;
       }
-      let text = "**🎒 Inventory**\n";
-      for (const [id, count] of Object.entries(counts)) {
+      const lines = Object.entries(counts).map(([id, count]) => {
         const def = SHOP_ITEMS.find((i) => i.id === id);
-        text += `**${def?.name || id}** x${count}\n`;
-      }
-      return send(text), true;
+        return `**${def?.name || id}** \u00d7${count}`;
+      });
+      return sendEmbed({
+        color: 0x99aab5,
+        title: "\ud83c\udf92  Inventory",
+        description: lines.join("\n"),
+        footer: { text: `${u.inventory.length} item(s) total` },
+      }), true;
     }
 
     case "stats":
@@ -391,22 +435,35 @@ export async function handleEconomyCommand(message, commandName, args) {
       const u = getUser(guildId, target.id);
       const level = getJobLevel(guildId, target.id);
       const job = JOBS.find((j) => j.id === u.job);
-      const name = target.id === userId ? "Your" : `<@${target.id}>'s`;
-      return send(`📊 ${name} Stats\nJob: **${job?.name || "Unemployed"}** (Level ${level})\nTimes worked: **${u.stats.timesWorked}**\nQuests completed: **${u.stats.questsCompleted}**\nGambles won: **${u.stats.gamblingWon}** | Lost: **${u.stats.gamblingLost}**\nTotal earned: ${formatCoins(u.stats.totalEarned)}`), true;
+      const name = target.id === userId ? "Your" : `${target.username}'s`;
+      return sendEmbed({
+        color: 0x5865f2,
+        title: `\ud83d\udcca  ${name} Stats`,
+        fields: [
+          { name: "Job", value: `${job?.name || "Unemployed"} (Lv. ${level})`, inline: true },
+          { name: "Times Worked", value: `${u.stats.timesWorked}`, inline: true },
+          { name: "Quests Done", value: `${u.stats.questsCompleted}`, inline: true },
+          { name: "Gambles Won", value: `${u.stats.gamblingWon}`, inline: true },
+          { name: "Gambles Lost", value: `${u.stats.gamblingLost}`, inline: true },
+          { name: "Total Earned", value: formatCoins(u.stats.totalEarned), inline: true },
+        ],
+      }), true;
     }
 
     case "economy":
     case "eco": {
       await message.channel.send({ embeds: [{
         color: 0xf59e0b,
-        title: "💰  Economy Commands",
+        title: "\ud83d\udcb0  Economy Commands",
+        description: "Earn coins, climb the leaderboard, and collect items!\nHere's everything you can do:",
         fields: [
-          { name: "💵 Money", value: "`!bal` — Check your wallet & bank\n`!d` — Claim daily reward (24h)\n`!dep <amt>` — Deposit into bank\n`!with <amt>` — Withdraw from bank\n`!give @user <amt>` — Send coins", inline: true },
-          { name: "💼 Work", value: "`!j` — Browse available jobs\n`!ap <job>` — Apply for a job\n`!w` — Work your job for coins\n`!q` — Get or check a quest", inline: true },
-          { name: "🎰 Gambling", value: "`!cf <amt>` — Coinflip, double or nothing\n`!sl <amt>` — Slot machine\n`!bj <amt>` — Blackjack vs dealer\n`!r @user` — Rob someone's wallet", inline: true },
-          { name: "📦 Other", value: "`!s` — Browse the shop · `!b <item>` — Buy an item\n`!inv` — Your inventory · `!lb` — Richest players · `!st` — Your stats", inline: false },
+          { name: "\ud83d\udcb5  Money", value: "`!bal` \u2014 Check your wallet & bank\n`!d` \u2014 Claim daily reward (24h)\n`!dep <amt>` \u2014 Deposit into bank\n`!with <amt>` \u2014 Withdraw from bank\n`!give @user <amt>` \u2014 Send coins", inline: true },
+          { name: "\ud83d\udcbc  Work", value: "`!j` \u2014 Browse available jobs\n`!ap <job>` \u2014 Apply for a job\n`!w` \u2014 Work your job for coins\n`!q` \u2014 Get or check a quest", inline: true },
+          { name: "\ud83c\udfb0  Gambling", value: "`!cf <amt>` \u2014 Coinflip\n`!sl <amt>` \u2014 Slot machine\n`!bj <amt>` \u2014 Blackjack\n`!r @user` \u2014 Rob someone", inline: true },
+          { name: "\u200b", value: "\u200b", inline: false },
+          { name: "\ud83d\udce6  Other", value: "`!s` \u2014 Shop \u00b7 `!b <item>` \u2014 Buy \u00b7 `!inv` \u2014 Inventory \u00b7 `!lb` \u2014 Leaderboard \u00b7 `!st` \u2014 Stats", inline: false },
         ],
-        footer: { text: "Amounts can be a number or \"all\" · Aliases shown are the shortest form" },
+        footer: { text: "Amounts can be a number or \"all\"  \u2022  Aliases shown are the shortest form" },
       }] }).catch(() => {});
       return true;
     }

@@ -562,6 +562,20 @@ export function createApi(client) {
     }
   });
 
+  /** Get guilds the current user's Discord account is in (intersection with bot's guilds) */
+  app.get("/api/user/guilds", (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user?.discordId) return res.json({ guilds: [] });
+    const userGuilds = [];
+    for (const [id, guild] of client.guilds.cache) {
+      const member = guild.members.cache.get(user.discordId);
+      if (member) {
+        userGuilds.push({ id, name: guild.name });
+      }
+    }
+    res.json({ guilds: userGuilds });
+  });
+
   /** Guild list — admin sees all, non-admin sees nothing */
   app.get("/api/guilds", (req, res) => {
     if (!isAdmin(req)) return res.json({ guilds: [] });
