@@ -10,6 +10,9 @@ import {
 } from "@discordjs/voice";
 import play from "play-dl";
 import { spawn } from "child_process";
+import ffmpegStatic from "ffmpeg-static";
+
+const FFMPEG = ffmpegStatic || "ffmpeg";
 
 /** @type {Map<string, MusicQueue>} */
 const queues = new Map();
@@ -231,7 +234,7 @@ export class MusicQueue {
     try {
       // Get direct audio URL via yt-dlp, then stream it through ffmpeg
       const audioUrl = await getAudioUrl(song.url);
-      const ffmpeg = spawn("ffmpeg", [
+      const ffmpeg = spawn(FFMPEG, [
         "-reconnect", "1",
         "-reconnect_streamed", "1",
         "-reconnect_delay_max", "5",
