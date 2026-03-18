@@ -12,18 +12,73 @@ import play from "play-dl";
 /** @type {Map<string, MusicQueue>} */
 const queues = new Map();
 let spotifyReady = false;
+let spotifyToken = null;
+let spotifyTokenExpiry = 0;
 
 /**
- * Initialise play-dl Spotify support if credentials are available.
+ * Get a Spotify access token using the client credentials flow.
+ */
+async function getSpotifyToken() {
+  if (spotifyToken && Date.now() < spotifyTokenExpiry) return spotifyToken;
+  const id = process.env.SPOTIFY_CLIENT_ID?.trim();
+  const secret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
+  if (!id || !secret) return null;
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+    },
+    body: "grant_type=client_credentials",
+  });
+  if (!res.ok) throw new Error(`Spotify auth failed: ${res.status}`);
+  const data = await res.json();
+  spotifyToken = data.access_token;
+  spotifyTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  return spotifyToken;
+}
+
+/**
+ * Fetch track info from Spotify Web API.
+ */
+async function spotifyGetTrack(trackId) {
+  const token = await getSpotifyToken();
+  const res = await fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const t = await res.json();
+  return { name: t.name, artists: t.artists?.map((a) => a.name) || [] };
+}
+
+/**
+ * Fetch playlist/album tracks from Spotify Web API.
+ */
+async function spotifyGetTracks(type, id) {
+  const token = await getSpotifyToken();
+  const endpoint = type === "playlist"
+    ? `https://api.spotify.com/v1/playlists/${id}/tracks?limit=50`
+    : `https://api.spotify.com/v1/albums/${id}/tracks?limit=50`;
+  const res = await fetch(endpoint, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.items || []).map((item) => {
+    const t = type === "playlist" ? item.track : item;
+    return t ? { name: t.name, artists: t.artists?.map((a) => a.name) || [] } : null;
+  }).filter(Boolean);
+}
+
+/**
+ * Initialise Spotify support if credentials are available.
  */
 export async function initMusic() {
   const spotifyId = process.env.SPOTIFY_CLIENT_ID?.trim();
   const spotifySecret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
   if (spotifyId && spotifySecret) {
     try {
-      await play.setToken({
-        spotify: { client_id: spotifyId, client_secret: spotifySecret, refresh_token: "", market: "US" },
-      });
+      await getSpotifyToken();
       spotifyReady = true;
       console.log("Spotify support enabled for music playback.");
     } catch (e) {
@@ -198,32 +253,37 @@ export async function resolveSong(query) {
   // Spotify track
   if (urlType === "sp_track") {
     if (!spotifyReady) return null;
-    const sp = await play.spotify(query);
-    const searched = await play.search(`${sp.name} ${sp.artists?.[0]?.name || ""}`, { limit: 1 });
+    const trackId = query.match(/track\/([a-zA-Z0-9]+)/)?.[1];
+    if (!trackId) return null;
+    const sp = await spotifyGetTrack(trackId);
+    if (!sp) return null;
+    const searched = await play.search(`${sp.name} ${sp.artists[0] || ""}`, { limit: 1 });
     if (searched.length === 0) return null;
     return {
       url: searched[0].url,
-      title: `${sp.name} — ${sp.artists?.map((a) => a.name).join(", ") || "Unknown"}`,
+      title: `${sp.name} — ${sp.artists.join(", ") || "Unknown"}`,
       duration: searched[0].durationRaw || "?",
-      thumbnail: sp.thumbnail?.url,
+      thumbnail: searched[0].thumbnails?.[0]?.url,
     };
   }
 
   // Spotify playlist/album
   if (urlType === "sp_playlist" || urlType === "sp_album") {
     if (!spotifyReady) return null;
-    const sp = await play.spotify(query);
-    const tracks = await sp.all_tracks();
+    const isPlaylist = urlType === "sp_playlist";
+    const id = query.match(new RegExp(`${isPlaylist ? "playlist" : "album"}\\/([a-zA-Z0-9]+)`))?.[1];
+    if (!id) return null;
+    const tracks = await spotifyGetTracks(isPlaylist ? "playlist" : "album", id);
     const results = [];
     for (const track of tracks.slice(0, 50)) {
       try {
-        const searched = await play.search(`${track.name} ${track.artists?.[0]?.name || ""}`, { limit: 1 });
+        const searched = await play.search(`${track.name} ${track.artists[0] || ""}`, { limit: 1 });
         if (searched.length > 0) {
           results.push({
             url: searched[0].url,
-            title: `${track.name} — ${track.artists?.map((a) => a.name).join(", ") || "Unknown"}`,
+            title: `${track.name} — ${track.artists.join(", ") || "Unknown"}`,
             duration: searched[0].durationRaw || "?",
-            thumbnail: track.thumbnail?.url,
+            thumbnail: searched[0].thumbnails?.[0]?.url,
           });
         }
       } catch {}
