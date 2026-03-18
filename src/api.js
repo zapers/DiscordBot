@@ -8,8 +8,8 @@ import { list as listSavedMessages, save as saveSavedMessage, get as getSavedMes
 import { list as listCustomCommands, add as addCustomCommand, remove as removeCustomCommand, getPrefix as getCustomCommandPrefix } from "./customCommands.js";
 import { getAllConfigs as getAllJailConfigs, removeConfig as removeJailConfig } from "./jailConfig.js";
 import { getLeaderboard as getEcoLeaderboard, JOBS, SHOP_ITEMS, QUESTS } from "./economy.js";
-import { create as createUser, validate as validateUser, getById, getByEmail, getByDiscordId, setDiscord, unsetDiscord, hasAnyUser, markVerified, listUsers, deleteUser } from "./users.js";
-import { isSmtpConfigured, sendVerificationCode, verifyCode } from "./emailVerification.js";
+import { create as createUser, validate as validateUser, getById, getByEmail, getByDiscordId, setDiscord, unsetDiscord, hasAnyUser, listUsers, deleteUser } from "./users.js";
+import { isSmtpConfigured, sendVerificationCode, verifyCode, setPendingRegistration, popPendingRegistration, hasPendingRegistration } from "./emailVerification.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { getDataDir } from "./dataDir.js";
 
@@ -135,22 +135,32 @@ export function createApi(client) {
   // Serve web UI
   app.use(express.static(join(__dirname, "..", "public")));
 
-  // Create account (register) – public
+  // Register – public. If email verification is configured, only sends a code
+  // (account is created later in /api/auth/verify). Otherwise creates immediately.
   app.post("/api/auth/register", async (req, res) => {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+    const trimmedEmail = String(email).trim();
+    const pw = String(password);
+    if (pw.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+    // Check if email is already taken
+    if (getByEmail(trimmedEmail)) {
+      return res.status(400).json({ error: "An account with this email already exists" });
+    }
     const needsVerification = isSmtpConfigured();
+    if (needsVerification) {
+      // Don't create account yet — store pending registration and send code
+      setPendingRegistration(trimmedEmail, pw);
+      const sent = await sendVerificationCode(trimmedEmail);
+      return res.json({ ok: true, needsVerification: true, email: trimmedEmail.toLowerCase(), emailFailed: !sent });
+    }
+    // No email verification — create account immediately
     try {
-      createUser(String(email).trim(), String(password), { verified: !needsVerification });
+      createUser(trimmedEmail, pw, { verified: true });
     } catch (e) {
       return res.status(400).json({ error: e.message });
     }
-    if (needsVerification) {
-      const sent = await sendVerificationCode(String(email).trim());
-      // Even if email fails, show verify page so user can resend
-      return res.json({ ok: true, needsVerification: true, email: String(email).trim().toLowerCase(), emailFailed: !sent });
-    }
-    const user = validateUser(String(email).trim(), String(password));
+    const user = validateUser(trimmedEmail, pw);
     if (!user) return res.status(500).json({ error: "Account created but login failed" });
     const sessionToken = randomBytes(24).toString("hex");
     sessionSet(sessionToken, { userId: user.id, email: user.email, discordId: user.discordId, username: user.discordUsername });
@@ -159,14 +169,26 @@ export function createApi(client) {
   });
 
   // Verify email with 6-digit code – public
+  // Creates the account on success (account is NOT created during /register)
   app.post("/api/auth/verify", (req, res) => {
     const { email, code } = req.body || {};
     if (!email || !code) return res.status(400).json({ error: "Email and code required" });
-    const result = verifyCode(String(email).trim(), String(code));
+    const trimmedEmail = String(email).trim();
+    const result = verifyCode(trimmedEmail, String(code));
     if (result === "expired") return res.status(400).json({ error: "Code expired. Click resend to get a new one." });
     if (result === "invalid") return res.status(400).json({ error: "Invalid code. Check your email and try again." });
-    markVerified(String(email).trim());
-    const user = getByEmail(String(email).trim());
+    // Retrieve the pending registration data
+    const pending = popPendingRegistration(trimmedEmail);
+    if (!pending) {
+      return res.status(400).json({ error: "Registration expired. Please register again." });
+    }
+    // Now create the account
+    try {
+      createUser(pending.email, pending.password, { verified: true });
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    const user = getByEmail(trimmedEmail);
     if (!user) return res.status(500).json({ error: "User not found" });
     const sessionToken = randomBytes(24).toString("hex");
     sessionSet(sessionToken, { userId: user.id, email: user.email });
@@ -178,11 +200,13 @@ export function createApi(client) {
   app.post("/api/auth/resend-code", async (req, res) => {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: "Email required" });
-    const user = getByEmail(String(email).trim());
-    if (!user) return res.status(404).json({ error: "No account with this email" });
-    if (user.verified) return res.json({ ok: true, alreadyVerified: true });
-    const sent = await sendVerificationCode(String(email).trim());
-    if (!sent) return res.status(500).json({ error: "Failed to send email. Check SMTP settings." });
+    const trimmedEmail = String(email).trim();
+    // Check for pending registration (account not yet created)
+    if (!hasPendingRegistration(trimmedEmail)) {
+      return res.status(404).json({ error: "No pending registration for this email. Please register again." });
+    }
+    const sent = await sendVerificationCode(trimmedEmail);
+    if (!sent) return res.status(500).json({ error: "Failed to send email. Please try again." });
     return res.json({ ok: true });
   });
 
@@ -192,9 +216,8 @@ export function createApi(client) {
     if (!email || !password) return res.status(400).json({ error: "Email and password required" });
     const user = validateUser(String(email).trim(), String(password));
     if (!user) return res.status(401).json({ error: "Invalid email or password" });
-    if (!user.verified && isSmtpConfigured()) {
-      await sendVerificationCode(String(email).trim());
-      return res.status(403).json({ error: "Email not verified. A new code has been sent to your inbox.", needsVerification: true, email: user.email });
+    if (!user.verified) {
+      return res.status(403).json({ error: "Email not verified. Please register again to verify your email." });
     }
     const sessionToken = randomBytes(24).toString("hex");
     sessionSet(sessionToken, { userId: user.id, email: user.email, discordId: user.discordId, username: user.discordUsername });
