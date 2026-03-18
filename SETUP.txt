@@ -1,0 +1,306 @@
+================================================================================
+                         KOVA — SETUP & CONFIGURATION
+================================================================================
+
+Kova is an all-in-one Discord bot with economy, moderation, music, fun commands,
+scheduled messages, tickets, giveaways, reminders, starboard, and a web panel.
+
+This file explains every environment variable and step needed to make all
+features fully functional.
+
+
+================================================================================
+ 1. REQUIRED — Bot Basics
+================================================================================
+
+  DISCORD_TOKEN=<your-bot-token>
+
+  How to get it:
+    1. Go to https://discord.com/developers/applications
+    2. Click "New Application" → name it "Kova" → go to "Bot" tab
+    3. Click "Reset Token" → copy the token
+    4. Under "Privileged Gateway Intents", enable ALL THREE:
+       ✅ PRESENCE INTENT
+       ✅ SERVER MEMBERS INTENT
+       ✅ MESSAGE CONTENT INTENT
+    5. Save changes
+
+  DISCORD_CLIENT_ID=<your-app-client-id>
+
+  How to get it:
+    1. Same Discord Developer Portal → your app → "General Information"
+    2. Copy the "Application ID" (this is the Client ID)
+
+
+================================================================================
+ 2. WEB PANEL — Authentication & Discord OAuth
+================================================================================
+
+  DISCORD_CLIENT_SECRET=<your-client-secret>
+
+  How to get it:
+    1. Developer Portal → your app → "OAuth2" tab
+    2. Copy "Client Secret" (or reset it)
+
+  PUBLIC_URL=<your-public-url>
+
+    e.g. https://kova.up.railway.app (no trailing slash)
+    This is needed for Discord OAuth (linking Discord accounts on the web panel).
+
+  After setting PUBLIC_URL, add this redirect URI in the Developer Portal:
+    → OAuth2 → Redirects → Add:
+      https://<your-public-url>/api/auth/discord/callback
+
+  ADMIN_DISCORD_IDS=<comma-separated-discord-user-ids>
+
+    e.g. ADMIN_DISCORD_IDS=123456789012345678,987654321098765432
+    These Discord users get full admin access on the web panel.
+    To find your Discord ID: Discord Settings → Advanced → Developer Mode ON,
+    then right-click your name → Copy User ID.
+
+  API_KEY=<optional-api-key>
+
+    An API key for programmatic access (e.g. from external apps).
+    Optional — only needed if you want to use the API without the web panel.
+
+
+================================================================================
+ 3. EMAIL VERIFICATION (Optional)
+================================================================================
+
+  Option A — Resend (recommended, works on Railway):
+
+    RESEND_API_KEY=<your-resend-api-key>
+    RESEND_FROM=noreply@yourdomain.com
+
+    How to set up:
+      1. Create account at https://resend.com
+      2. Go to API Keys → Create new key → copy it
+      3. IMPORTANT: To send to ANY email (not just your own), you must verify
+         a domain: https://resend.com/domains → Add Domain → follow DNS steps
+      4. Once verified, set RESEND_FROM=noreply@yourdomain.com
+
+  Option B — SMTP (blocked on Railway, works locally):
+
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USER=you@gmail.com
+    SMTP_PASS=<app-password>
+    SMTP_FROM=you@gmail.com
+
+  If neither is configured, email verification is disabled and accounts are
+  created immediately on registration.
+
+
+================================================================================
+ 4. MUSIC — Spotify Support (Optional)
+================================================================================
+
+  YouTube and SoundCloud work out of the box — no keys needed.
+
+  For Spotify link support (auto-searches YouTube for the track):
+
+    SPOTIFY_CLIENT_ID=<your-spotify-client-id>
+    SPOTIFY_CLIENT_SECRET=<your-spotify-client-secret>
+
+    How to get them:
+      1. Go to https://developer.spotify.com/dashboard
+      2. Click "Create app"
+         - App name: Kova
+         - Redirect URI: http://localhost (not actually used, but required)
+         - Select "Web API"
+         - Accept terms → Save
+      3. Go to your new app → Settings
+      4. Copy "Client ID" and "Client Secret"
+
+    Without these, Spotify URLs will return an error. YouTube search and direct
+    YouTube/SoundCloud URLs will still work perfectly.
+
+
+================================================================================
+ 5. RAILWAY / HOSTING SPECIFICS
+================================================================================
+
+  DATA_DIR=/data
+
+    On Railway, mount a volume at /data so your data persists between deploys.
+    Railway → your service → Settings → Volumes → Mount path: /data
+
+  PORT=3000
+
+    Railway sets this automatically. Locally, defaults to 3000.
+
+  Railway Nixpacks (for music/voice):
+    The bot uses pure JavaScript audio packages (opusscript, libsodium-wrappers)
+    so no native build tools are needed. However, ffmpeg IS needed for audio
+    streaming. Add this to your Railway environment:
+
+    NIXPACKS_PKGS=ffmpeg
+
+    Or create a file called `nixpacks.toml` in the project root with:
+      [phases.setup]
+      aptPkgs = ["ffmpeg"]
+
+
+================================================================================
+ 6. LOCAL DEVELOPMENT
+================================================================================
+
+  1. Clone the repo
+  2. Copy .env.example to .env and fill in the values (or create .env manually)
+  3. npm install
+  4. npm start
+
+  The bot will run on http://localhost:3000 (web panel).
+  Data is stored in the ./data/ directory.
+
+
+================================================================================
+ 7. ALL FEATURES & THEIR COMMANDS
+================================================================================
+
+  MUSIC (requires voice channel):
+    !play <url/search>    - Play a song (YouTube, Spotify*, SoundCloud)
+    !skip                 - Skip current song
+    !stop / !dc           - Stop and disconnect
+    !queue                - View the queue
+    !np                   - Now playing
+    !pause / !resume      - Pause/resume playback
+    !volume <0-150>       - Set volume
+    !loop                 - Cycle loop mode (off → song → queue)
+    !shuffle              - Shuffle the queue
+    !remove <position>    - Remove a song from the queue
+    !clearqueue           - Clear the entire queue
+
+  ECONOMY:
+    !eco                  - Full economy command reference
+    !bal, !daily, !work, !jobs, !apply, !quest
+    !coinflip, !slots, !blackjack, !rob, !give
+    !shop, !buy, !inventory, !leaderboard, !stats
+    !deposit, !withdraw
+
+  MODERATION:
+    !jail @user           - Jail a member (requires /jail-setup first)
+    !unjail @user         - Release from jail
+    /warn @user <reason>  - Warn a user
+    /warnings @user       - View warnings
+    /clearwarnings @user  - Clear all warnings
+    /purge <amount>       - Bulk delete messages
+
+  FUN:
+    !8ball <question>     - Magic 8-ball
+    !dice [sides]         - Roll a die
+    !rps <r/p/s>          - Rock Paper Scissors
+    !choose a | b | c     - Random choice
+    !rate <thing>         - Rate something /10
+    !ship @a @b           - Ship compatibility
+    !mock <text>          - sPoNgEbOb text
+    !reverse <text>       - Reverse text
+    !roast [@user]        - Roast someone
+    !compliment [@user]   - Compliment someone
+    !hack @user           - Fake "hack" someone
+    !pp [@user]           - PP size
+    !iq [@user]           - IQ test
+    !howgay [@user]       - How gay meter
+
+  UTILITY:
+    !ping                 - Bot latency
+    !uptime               - Bot uptime
+    !avatar [@user]       - Get avatar
+    !banner [@user]       - Get profile banner
+    !serverinfo           - Server information
+    !userinfo [@user]     - User information
+    !roleinfo <role>      - Role details
+    !emojis               - List server emojis
+    !membercount          - Member count
+
+  REMINDERS:
+    !remind <time> <msg>  - Set a reminder (e.g. !remind 30m check oven)
+    !reminders            - List your reminders
+    !remind cancel <id>   - Cancel a reminder
+
+  POLLS:
+    !poll Q | A | B | C   - Create a poll with reaction voting
+
+  GIVEAWAYS:
+    !giveaway <time> <prize>      - Start a giveaway
+    !giveaway reroll <messageId>  - Reroll a winner
+
+  AFK:
+    !afk [reason]         - Set yourself as AFK (auto-removed on next message)
+
+  TICKETS:
+    !ticket [reason]      - Open a support ticket
+    !ticket close         - Close the current ticket
+    /ticket-setup         - Configure ticket system (admin)
+
+  SNIPE:
+    !snipe                - See last deleted message in channel
+    !esnipe               - See last edited message in channel
+
+  STARBOARD (slash commands):
+    /starboard setup <channel> [threshold]  - Enable starboard
+    /starboard off                          - Disable starboard
+
+  WELCOME/LEAVE (slash commands):
+    /welcome set <channel> <message>  - Set welcome message
+    /welcome off                      - Disable
+    /leave set <channel> <message>    - Set leave message
+    /leave off                        - Disable
+    Placeholders: {user} {username} {server} {memberCount}
+
+  LEVELS (automatic + slash commands):
+    /level [@user]        - Check level and XP
+    /leaderboard [type]   - View leaderboard (XP, messages, voice)
+
+  CUSTOM COMMANDS (web panel + slash):
+    /send                 - Send a rich embed
+    /schedule             - Schedule recurring messages
+    /message              - Save/send message templates
+
+  DELETED MESSAGE LOGGING:
+    /log-deletes here     - Log deleted messages to this channel
+    /log-deletes off      - Stop logging
+
+
+================================================================================
+ 8. EXAMPLE .env FILE
+================================================================================
+
+  # Required
+  DISCORD_TOKEN=your-bot-token-here
+  DISCORD_CLIENT_ID=your-client-id
+
+  # Web panel auth
+  DISCORD_CLIENT_SECRET=your-client-secret
+  PUBLIC_URL=https://your-app.up.railway.app
+  ADMIN_DISCORD_IDS=your-discord-user-id
+
+  # Email (optional)
+  RESEND_API_KEY=re_xxxxxxxxxx
+  RESEND_FROM=noreply@yourdomain.com
+
+  # Music - Spotify (optional)
+  SPOTIFY_CLIENT_ID=your-spotify-client-id
+  SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
+
+  # Railway
+  DATA_DIR=/data
+  NIXPACKS_PKGS=ffmpeg
+
+
+================================================================================
+ 9. ROLLBACK
+================================================================================
+
+  A git tag was created before these features were added:
+
+    git checkout v1.0-pre-features
+
+  This will restore the exact codebase from before the feature additions.
+  To go back to the latest:
+
+    git checkout main
+
+
+================================================================================

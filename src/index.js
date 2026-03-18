@@ -7,10 +7,16 @@ import { migrateIfNeeded as migrateCustomCommands, totalCount as totalCustomComm
 import { getConfig as getJailConfig } from "./jailConfig.js";
 import { getDataDir } from "./dataDir.js";
 import { slashCommands } from "./commands.js";
-import { handleMessage } from "./handlers/messageHandler.js";
+import { handleMessage, setClient as setMessageClient } from "./handlers/messageHandler.js";
 import { handleInteraction } from "./handlers/interactionHandler.js";
 import { handleMessageDelete, handleMessageUpdate } from "./handlers/deleteLogHandler.js";
 import { handleVoiceStateUpdate } from "./handlers/voiceStateHandler.js";
+import { initMusic } from "./music.js";
+import { initReminders } from "./reminders.js";
+import { initGiveaways } from "./giveaways.js";
+import { handleMemberJoin, handleMemberLeave } from "./welcomeConfig.js";
+import { handleStarboardReaction } from "./starboard.js";
+import { recordDeleted, recordEdited } from "./snipe.js";
 
 config();
 
@@ -26,12 +32,16 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessageReactions,
   ],
-  partials: [Partials.Message, Partials.Channel],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
 client.once("clientReady", async () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  // Pass client reference to message handler for utility commands
+  setMessageClient(client);
 
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
   try {
@@ -40,7 +50,7 @@ client.once("clientReady", async () => {
       for (const [guildId] of guilds) {
         await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: slashCommands });
       }
-      console.log(`Slash commands registered in ${guilds.size} guild(s) (including /log-deletes).`);
+      console.log(`Slash commands registered in ${guilds.size} guild(s).`);
     } else {
       await rest.put(Routes.applicationCommands(client.user.id), { body: slashCommands });
       console.warn("No guilds in cache. Registered global commands (may take up to 1 hour to appear).");
@@ -52,8 +62,13 @@ client.once("clientReady", async () => {
   const dataDir = getDataDir();
   const customCount = totalCustomCommands();
   const logChannelCount = getAllLogChannels().length;
-  console.log(`Data directory: ${dataDir} (deleted-log channels: ${logChannelCount}, custom commands: ${customCount}). On Railway, set DATA_DIR to a volume path (e.g. /data) so this data persists across restarts.`);
+  console.log(`Data directory: ${dataDir} (deleted-log channels: ${logChannelCount}, custom commands: ${customCount}).`);
+
+  // Initialise subsystems
   initScheduler(client);
+  initReminders(client);
+  initGiveaways(client);
+  await initMusic().catch((e) => console.warn("Music init:", e.message));
 
   const port = Number(process.env.PORT) || 3000;
   const api = createApi(client);
@@ -73,20 +88,42 @@ client.on("guildCreate", async (guild) => {
 });
 
 client.on("guildMemberAdd", async (member) => {
+  // Auto-assign member role (jail system)
   const cfg = getJailConfig(member.guild.id);
-  if (!cfg?.memberRoleId) return;
-  try {
-    await member.roles.add(cfg.memberRoleId);
-  } catch (e) {
-    console.error(`Failed to assign member role to ${member.user?.tag} in ${member.guild.name}:`, e.message || e);
+  if (cfg?.memberRoleId) {
+    try {
+      await member.roles.add(cfg.memberRoleId);
+    } catch (e) {
+      console.error(`Failed to assign member role to ${member.user?.tag} in ${member.guild.name}:`, e.message || e);
+    }
   }
+  // Welcome message
+  handleMemberJoin(member);
+});
+
+client.on("guildMemberRemove", (member) => {
+  handleMemberLeave(member);
 });
 
 client.on("messageCreate", (message) => handleMessage(message));
-client.on("messageDelete", (message) => handleMessageDelete(message, client));
-client.on("messageUpdate", (oldMessage, newMessage) => handleMessageUpdate(oldMessage, newMessage, client));
+
+client.on("messageDelete", (message) => {
+  recordDeleted(message); // snipe
+  handleMessageDelete(message, client); // deleted log
+});
+
+client.on("messageUpdate", (oldMessage, newMessage) => {
+  recordEdited(oldMessage, newMessage); // edit snipe
+  handleMessageUpdate(oldMessage, newMessage, client); // edit log
+});
+
 client.on("voiceStateUpdate", (oldState, newState) => handleVoiceStateUpdate(oldState, newState));
 client.on("interactionCreate", (interaction) => handleInteraction(interaction));
+
+// Starboard — react to star reactions
+client.on("messageReactionAdd", (reaction) => {
+  handleStarboardReaction(reaction, client);
+});
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {

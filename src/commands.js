@@ -202,10 +202,72 @@ export const purgeCommand = {
   ],
 };
 
+export const starboardCommand = {
+  name: "starboard",
+  description: "Configure the starboard",
+  options: [
+    {
+      name: "setup",
+      type: 1,
+      description: "Set the starboard channel and star threshold",
+      options: [
+        { name: "channel", type: 7, description: "Channel for starboard posts", required: true },
+        { name: "threshold", type: 4, description: "Stars needed (default: 3)", required: false, min_value: 1, max_value: 25 },
+      ],
+    },
+    { name: "off", type: 1, description: "Disable starboard" },
+  ],
+};
+
+export const welcomeCommand = {
+  name: "welcome",
+  description: "Configure welcome messages",
+  options: [
+    {
+      name: "set",
+      type: 1,
+      description: "Set a welcome message for new members",
+      options: [
+        { name: "channel", type: 7, description: "Channel for welcome messages", required: true },
+        { name: "message", type: 3, description: "Message ({user} {username} {server} {memberCount})", required: true },
+      ],
+    },
+    { name: "off", type: 1, description: "Disable welcome messages" },
+  ],
+};
+
+export const leaveCommand = {
+  name: "leave",
+  description: "Configure leave messages",
+  options: [
+    {
+      name: "set",
+      type: 1,
+      description: "Set a leave message when members leave",
+      options: [
+        { name: "channel", type: 7, description: "Channel for leave messages", required: true },
+        { name: "message", type: 3, description: "Message ({username} {server} {memberCount})", required: true },
+      ],
+    },
+    { name: "off", type: 1, description: "Disable leave messages" },
+  ],
+};
+
+export const ticketSetupCommand = {
+  name: "ticket-setup",
+  description: "Configure the ticket system",
+  options: [
+    { name: "category", type: 7, description: "Category for ticket channels", required: true },
+    { name: "support_role", type: 8, description: "Role that can see tickets", required: false },
+    { name: "log_channel", type: 7, description: "Channel for ticket transcripts", required: false },
+  ],
+};
+
 export const slashCommands = [
   sendCommand, scheduleCommand, messageCommand, logDeletesCommand,
   jailSetupCommand, jailAssignAllCommand,
   levelCommand, leaderboardCommand,
   warnCommand, warningsCommand, clearWarningsCommand,
   purgeCommand,
+  starboardCommand, welcomeCommand, leaveCommand, ticketSetupCommand,
 ];

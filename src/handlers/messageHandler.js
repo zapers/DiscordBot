@@ -4,6 +4,15 @@ import { getConfig as getJailConfig, saveJailedRoles, popJailedRoles } from "../
 import { awardMessageXp } from "../levels.js";
 import { addWarning, getWarnings } from "../warnings.js";
 import { log as auditLog } from "../auditLog.js";
+import { handleMusicCommand, MUSIC_COMMANDS } from "../musicCommands.js";
+import { handleFunCommand, FUN_COMMANDS } from "../funCommands.js";
+import { handleUtilityCommand, UTILITY_COMMANDS } from "../utilityCommands.js";
+import { handleAfkCheck, setAfk, getAfk } from "../afk.js";
+import { createReminder, listReminders, cancelReminder, formatMs } from "../reminders.js";
+import { createPoll } from "../polls.js";
+import { startGiveaway, rerollGiveaway } from "../giveaways.js";
+import { openTicket, closeTicket } from "../ticketSystem.js";
+import { getSnipe, getEditSnipe } from "../snipe.js";
 
 // Accept both ASCII "!" and fullwidth "！" (U+FF01) as custom-command prefix
 const CUSTOM_CMD_PREFIXES = ["!", "\uFF01"];
@@ -55,6 +64,10 @@ async function autoJail(message, guildId) {
   }
 }
 
+/** @param {import("discord.js").Client} client */
+let _client = null;
+export function setClient(client) { _client = client; }
+
 export async function handleMessage(message) {
   if (message.author?.bot) return;
   const raw = message.content;
@@ -63,6 +76,11 @@ export async function handleMessage(message) {
   if (!content) return;
 
   const guildId = message.guildId ?? message.guild?.id;
+
+  // AFK check (handles mention notifications and auto-remove)
+  if (guildId) {
+    await handleAfkCheck(message);
+  }
 
   // Anti-spam check (only in guilds)
   if (guildId && message.channelId) {
@@ -122,13 +140,16 @@ export async function handleMessage(message) {
   // !help command
   if (commandName === "help" || commandName === "h") {
     const fields = [
-      { name: "\u200b\n📖  General", value: "> `!help` / `!h` — Show this menu", inline: false },
+      { name: "\u200b\n📖  General", value: "> `!help` `!ping` `!uptime` `!avatar` `!serverinfo` `!userinfo`", inline: false },
       { name: "💰  Economy", value: "> `!bal` `!d` `!w` `!j` `!ap` `!q`\n> `!cf` `!sl` `!bj` `!r` `!give` `!lb`\n> `!dep` `!with` `!s` `!b` `!inv` `!st`\n> *Type* `!eco` *for full details*", inline: true },
-      { name: "⚖️  Moderation", value: "> `!jail @user` — Jail a member\n> `!unjail @user` — Release a member", inline: true },
+      { name: "⚖️  Moderation", value: "> `!jail @user` `!unjail @user`\n> `!ticket` `!ticket close`", inline: true },
+      { name: "🎵  Music", value: "> `!play` `!skip` `!stop` `!queue`\n> `!np` `!pause` `!resume` `!loop`\n> `!volume` `!shuffle` `!remove`", inline: true },
+      { name: "🎲  Fun", value: "> `!8ball` `!dice` `!rps` `!choose`\n> `!ship` `!rate` `!mock` `!roast`\n> `!hack` `!pp` `!iq` `!howgay`", inline: true },
+      { name: "🔧  Utility", value: "> `!remind` `!reminders` `!poll`\n> `!giveaway` `!afk` `!snipe` `!esnipe`\n> `!banner` `!roleinfo` `!emojis`", inline: true },
     ];
     const customCmds = listCustomCommands(message.guild?.id);
     if (customCmds.length > 0) {
-      const cmdList = customCmds.map((c) => `\`!${c.name}\``).join(" \u2003 ");
+      const cmdList = customCmds.map((c) => `\`!${c.name}\``).join("  ");
       fields.push({ name: "⚡  Custom Commands", value: "> " + cmdList, inline: false });
     }
     await message.channel.send({ embeds: [{
@@ -141,14 +162,124 @@ export async function handleMessage(message) {
     return;
   }
 
+  // Music commands
+  if (MUSIC_COMMANDS.has(commandName)) {
+    try { await handleMusicCommand(message, commandName, rest); } catch (e) { console.error("Music command error:", e); }
+    return;
+  }
+
   // Economy commands
   if (ECONOMY_COMMAND_NAMES.has(commandName)) {
-    try {
-      await handleEconomyCommand(message, commandName, rest);
-    } catch (e) {
-      console.error("Economy command error:", e);
-    }
+    try { await handleEconomyCommand(message, commandName, rest); } catch (e) { console.error("Economy command error:", e); }
     return;
+  }
+
+  // Fun commands
+  if (FUN_COMMANDS.has(commandName)) {
+    try { await handleFunCommand(message, commandName, rest); } catch (e) { console.error("Fun command error:", e); }
+    return;
+  }
+
+  // Utility commands
+  if (UTILITY_COMMANDS.has(commandName)) {
+    try { await handleUtilityCommand(message, _client, commandName, rest); } catch (e) { console.error("Utility command error:", e); }
+    return;
+  }
+
+  // --- Standalone commands ---
+
+  // AFK
+  if (commandName === "afk") {
+    if (!guildId) return;
+    setAfk(guildId, message.author.id, rest || "AFK");
+    return message.channel.send({
+      embeds: [{ color: 0x99aab5, description: `💤 <@${message.author.id}> is now AFK: ${rest || "AFK"}` }],
+    }).catch(() => {});
+  }
+
+  // Reminders
+  if (commandName === "remind" || commandName === "reminder") {
+    const parts = rest.split(/\s+/);
+    if (parts[0] === "cancel" && parts[1]) {
+      const ok = cancelReminder(message.author.id, parts[1]);
+      return message.channel.send({ content: ok ? "✅ Reminder cancelled." : "❌ Reminder not found." }).catch(() => {});
+    }
+    if (parts.length < 2) return message.channel.send({ content: "Usage: `!remind <time> <message>`\nExample: `!remind 30m check the oven`" }).catch(() => {});
+    const timeStr = parts[0];
+    const reminderMsg = parts.slice(1).join(" ");
+    const result = createReminder(message.author.id, message.channelId, timeStr, reminderMsg);
+    if (!result.ok) return message.channel.send({ content: `❌ ${result.error}` }).catch(() => {});
+    return message.channel.send({
+      embeds: [{
+        color: 0x57f287,
+        description: `⏰ Reminder set! I'll remind you <t:${Math.floor(result.fireAt / 1000)}:R>`,
+        footer: { text: `ID: ${result.id} · Cancel with !remind cancel ${result.id}` },
+      }],
+    }).catch(() => {});
+  }
+
+  if (commandName === "reminders") {
+    const list = listReminders(message.author.id);
+    if (list.length === 0) return message.channel.send({ content: "You have no active reminders." }).catch(() => {});
+    const lines = list.map((r) => `\`${r.id}\` — ${r.message.slice(0, 60)} (<t:${Math.floor(r.fireAt / 1000)}:R>)`);
+    return message.channel.send({
+      embeds: [{
+        color: 0x5865f2,
+        title: `⏰ Your Reminders (${list.length})`,
+        description: lines.join("\n"),
+        footer: { text: "Cancel with !remind cancel <id>" },
+      }],
+    }).catch(() => {});
+  }
+
+  // Polls
+  if (commandName === "poll") {
+    return createPoll(message, rest);
+  }
+
+  // Giveaways
+  if (commandName === "giveaway" || commandName === "gw") {
+    if (rest.startsWith("reroll ")) {
+      return rerollGiveaway(message, rest.slice(7).trim());
+    }
+    return startGiveaway(message, rest);
+  }
+
+  // Tickets
+  if (commandName === "ticket") {
+    if (rest.toLowerCase() === "close") return closeTicket(message);
+    return openTicket(message, rest);
+  }
+
+  // Snipe
+  if (commandName === "snipe") {
+    const entry = getSnipe(message.channelId);
+    if (!entry) return message.channel.send({ content: "Nothing to snipe!" }).catch(() => {});
+    return message.channel.send({
+      embeds: [{
+        color: 0xed4245,
+        author: { name: entry.author.username, icon_url: entry.author.avatarURL },
+        description: entry.content || "*(no text)*",
+        image: entry.attachmentURL ? { url: entry.attachmentURL } : undefined,
+        footer: { text: `Deleted ${Math.floor((Date.now() - entry.timestamp) / 1000)}s ago` },
+      }],
+    }).catch(() => {});
+  }
+
+  if (commandName === "esnipe" || commandName === "editsnipe") {
+    const entry = getEditSnipe(message.channelId);
+    if (!entry) return message.channel.send({ content: "Nothing to edit-snipe!" }).catch(() => {});
+    return message.channel.send({
+      embeds: [{
+        color: 0xfee75c,
+        author: { name: entry.author.username, icon_url: entry.author.avatarURL },
+        fields: [
+          { name: "Before", value: entry.oldContent.slice(0, 1024) },
+          { name: "After", value: entry.newContent.slice(0, 1024) },
+        ],
+        footer: { text: `Edited ${Math.floor((Date.now() - entry.timestamp) / 1000)}s ago` },
+      }],
+    }).catch(() => {});
   }
 
   // Built-in: !jail @user and !unjail @user
@@ -197,6 +328,7 @@ export async function handleMessage(message) {
     return;
   }
 
+  // Custom commands (last priority)
   const cmd = getCustomCommand(commandName, message.guild?.id);
   if (!cmd) return;
   const author = message.author;

@@ -7,6 +7,9 @@ import { addSchedule, listSchedules, removeSchedule } from "../scheduler.js";
 import { getStats, getLeaderboard } from "../levels.js";
 import { addWarning, getWarnings, clearWarnings } from "../warnings.js";
 import { log as auditLog } from "../auditLog.js";
+import { setStarboardConfig, removeStarboardConfig, getStarboardConfig } from "../starboard.js";
+import { setWelcomeMessage, setLeaveMessage, disableWelcome, disableLeave } from "../welcomeConfig.js";
+import { setTicketConfig } from "../ticketSystem.js";
 
 export async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) return;
@@ -402,6 +405,78 @@ export async function handleInteraction(interaction) {
       await interaction.editReply({ content: `Failed: ${e.message}` });
     }
     return;
+  }
+
+  // --- /starboard ---
+  if (interaction.commandName === "starboard") {
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      return interaction.reply({ content: "You need **Manage Server** permission.", ephemeral: true });
+    }
+    const sub = interaction.options.getSubcommand();
+    if (sub === "setup") {
+      const channel = interaction.options.getChannel("channel");
+      const threshold = interaction.options.getInteger("threshold") || 3;
+      setStarboardConfig(interaction.guildId, channel.id, threshold);
+      return interaction.reply({ content: `⭐ Starboard set to ${channel} (threshold: ${threshold} stars).`, ephemeral: false });
+    }
+    if (sub === "off") {
+      removeStarboardConfig(interaction.guildId);
+      return interaction.reply({ content: "Starboard disabled.", ephemeral: false });
+    }
+    return;
+  }
+
+  // --- /welcome ---
+  if (interaction.commandName === "welcome") {
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      return interaction.reply({ content: "You need **Manage Server** permission.", ephemeral: true });
+    }
+    const sub = interaction.options.getSubcommand();
+    if (sub === "set") {
+      const channel = interaction.options.getChannel("channel");
+      const msg = interaction.options.getString("message");
+      setWelcomeMessage(interaction.guildId, channel.id, msg);
+      return interaction.reply({ content: `✅ Welcome messages will be sent to ${channel}.\nTemplate: ${msg}`, ephemeral: false });
+    }
+    if (sub === "off") {
+      disableWelcome(interaction.guildId);
+      return interaction.reply({ content: "Welcome messages disabled.", ephemeral: false });
+    }
+    return;
+  }
+
+  // --- /leave ---
+  if (interaction.commandName === "leave") {
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      return interaction.reply({ content: "You need **Manage Server** permission.", ephemeral: true });
+    }
+    const sub = interaction.options.getSubcommand();
+    if (sub === "set") {
+      const channel = interaction.options.getChannel("channel");
+      const msg = interaction.options.getString("message");
+      setLeaveMessage(interaction.guildId, channel.id, msg);
+      return interaction.reply({ content: `✅ Leave messages will be sent to ${channel}.\nTemplate: ${msg}`, ephemeral: false });
+    }
+    if (sub === "off") {
+      disableLeave(interaction.guildId);
+      return interaction.reply({ content: "Leave messages disabled.", ephemeral: false });
+    }
+    return;
+  }
+
+  // --- /ticket-setup ---
+  if (interaction.commandName === "ticket-setup") {
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      return interaction.reply({ content: "You need **Manage Server** permission.", ephemeral: true });
+    }
+    const category = interaction.options.getChannel("category");
+    const supportRole = interaction.options.getRole("support_role");
+    const logChannel = interaction.options.getChannel("log_channel");
+    setTicketConfig(interaction.guildId, category.id, supportRole?.id, logChannel?.id);
+    return interaction.reply({
+      content: `🎫 Ticket system configured!\n**Category:** ${category.name}\n**Support role:** ${supportRole?.name || "None"}\n**Log channel:** ${logChannel ? `#${logChannel.name}` : "None"}\n\nUsers can type \`!ticket [reason]\` to open a ticket.`,
+      ephemeral: false,
+    });
   }
 
   if (interaction.commandName !== "send") return;
