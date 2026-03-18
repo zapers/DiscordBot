@@ -379,6 +379,31 @@ export async function handleInteraction(interaction) {
     return;
   }
 
+  // --- /purge ---
+  if (interaction.commandName === "purge") {
+    if (!interaction.memberPermissions?.has("ManageMessages")) {
+      return interaction.reply({ content: "You need **Manage Messages** permission to use this.", ephemeral: true });
+    }
+    const amount = interaction.options.getInteger("amount");
+    const targetUser = interaction.options.getUser("user");
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      let deleted;
+      if (targetUser) {
+        const fetched = await interaction.channel.messages.fetch({ limit: 100 });
+        const filtered = fetched.filter((m) => m.author.id === targetUser.id).first(amount);
+        deleted = await interaction.channel.bulkDelete(filtered, true);
+      } else {
+        deleted = await interaction.channel.bulkDelete(amount, true);
+      }
+      await interaction.editReply({ content: `Deleted **${deleted.size}** message(s).` });
+    } catch (e) {
+      console.error("Purge failed:", e);
+      await interaction.editReply({ content: `Failed: ${e.message}` });
+    }
+    return;
+  }
+
   if (interaction.commandName !== "send") return;
 
   const channel = interaction.options.getChannel("channel");
