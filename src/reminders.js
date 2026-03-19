@@ -1,9 +1,10 @@
 import { createStore } from "./storage.js";
 import { randomBytes } from "crypto";
+import { safeTimeout } from "./safeTimeout.js";
 
 const store = createStore("reminders.json", () => []);
 
-/** @type {Map<string, NodeJS.Timeout>} */
+/** @type {Map<string, {clear: Function}>} */
 const timers = new Map();
 let discordClient = null;
 
@@ -52,14 +53,14 @@ export function initReminders(client) {
 
 function scheduleTimer(reminder) {
   const delay = Math.max(1000, reminder.fireAt - Date.now());
-  const timeout = setTimeout(() => {
+  const handle = safeTimeout(() => {
     fireReminder(reminder);
     // Remove from disk
     const all = store.load();
     store.save(all.filter((r) => r.id !== reminder.id));
     timers.delete(reminder.id);
   }, delay);
-  timers.set(reminder.id, timeout);
+  timers.set(reminder.id, handle);
 }
 
 async function fireReminder(reminder) {
@@ -144,7 +145,7 @@ export function cancelReminder(userId, reminderId) {
   all.splice(idx, 1);
   store.save(all);
   const timer = timers.get(reminderId);
-  if (timer) { clearTimeout(timer); timers.delete(reminderId); }
+  if (timer) { timer.clear(); timers.delete(reminderId); }
   return true;
 }
 

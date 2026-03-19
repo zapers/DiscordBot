@@ -15,8 +15,9 @@ import { openTicket, closeTicket } from "../ticketSystem.js";
 import { getSnipe, getEditSnipe } from "../snipe.js";
 import { parseTime } from "../reminders.js";
 import { sendModLog } from "../modLog.js";
+import { safeTimeout } from "../safeTimeout.js";
 
-// Timed jail auto-unjail timers
+// Timed jail auto-unjail timers  (value = { clear() } from safeTimeout)
 const jailTimers = new Map();
 
 // Accept both ASCII "!" and fullwidth "！" (U+FF01) as custom-command prefix
@@ -311,7 +312,7 @@ export async function handleMessage(message) {
     if (commandName === "jail" && durationArg) {
       durationMs = parseTime(durationArg);
       if (durationMs) {
-        const MAX_JAIL_MS = 28 * 24 * 60 * 60 * 1000; // 28 days max
+        const MAX_JAIL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year max
         if (durationMs > MAX_JAIL_MS) durationMs = MAX_JAIL_MS;
         durationLabel = formatMs(durationMs);
       }
@@ -346,8 +347,8 @@ export async function handleMessage(message) {
         if (durationMs) {
           const timerKey = `${guildId}:${target.id}`;
           // Clear existing timer if any
-          if (jailTimers.has(timerKey)) clearTimeout(jailTimers.get(timerKey));
-          const timer = setTimeout(async () => {
+          if (jailTimers.has(timerKey)) jailTimers.get(timerKey).clear();
+          const handle = safeTimeout(async () => {
             jailTimers.delete(timerKey);
             try {
               const m = await message.guild.members.fetch(target.id);
@@ -364,13 +365,13 @@ export async function handleMessage(message) {
               console.error("Auto-unjail failed:", e.message);
             }
           }, durationMs);
-          jailTimers.set(timerKey, timer);
+          jailTimers.set(timerKey, handle);
         }
       } else {
         // Clear any pending auto-unjail timer
         const timerKey = `${guildId}:${target.id}`;
         if (jailTimers.has(timerKey)) {
-          clearTimeout(jailTimers.get(timerKey));
+          jailTimers.get(timerKey).clear();
           jailTimers.delete(timerKey);
         }
         if (cfg.criminalRoleId) await member.roles.remove(cfg.criminalRoleId);

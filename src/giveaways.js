@@ -1,10 +1,11 @@
 import { createStore } from "./storage.js";
 import { randomBytes } from "crypto";
 import { parseTime, formatMs } from "./reminders.js";
+import { safeTimeout } from "./safeTimeout.js";
 
 const store = createStore("giveaways.json", () => []);
 
-/** @type {Map<string, NodeJS.Timeout>} */
+/** @type {Map<string, {clear: Function}>} */
 const giveawayTimers = new Map();
 let discordClient = null;
 
@@ -25,8 +26,8 @@ export function initGiveaways(client) {
 
 function scheduleEnd(giveaway) {
   const delay = Math.max(1000, giveaway.endsAt - Date.now());
-  const timeout = setTimeout(() => endGiveaway(giveaway.id), delay);
-  giveawayTimers.set(giveaway.id, timeout);
+  const handle = safeTimeout(() => endGiveaway(giveaway.id), delay);
+  giveawayTimers.set(giveaway.id, handle);
 }
 
 /**
@@ -95,7 +96,7 @@ export async function endGiveaway(giveawayId) {
   store.save(all);
 
   const timer = giveawayTimers.get(giveawayId);
-  if (timer) { clearTimeout(timer); giveawayTimers.delete(giveawayId); }
+  if (timer) { timer.clear(); giveawayTimers.delete(giveawayId); }
 
   if (!discordClient) return;
 
