@@ -1,5 +1,5 @@
+import "dotenv/config";
 import { Client, GatewayIntentBits, Partials, REST, Routes } from "discord.js";
-import { config } from "dotenv";
 import { createApi } from "./api.js";
 import { initScheduler } from "./scheduler.js";
 import { getAllLogChannels } from "./deletedLogConfig.js";
@@ -18,8 +18,6 @@ import { handleMemberJoin, handleMemberLeave } from "./welcomeConfig.js";
 import { handleStarboardReaction } from "./starboard.js";
 import { recordDeleted, recordEdited } from "./snipe.js";
 import { sendModLog } from "./modLog.js";
-
-config();
 
 const WEB_ONLY = (process.env.WEB_ONLY || "").toLowerCase() === "true";
 
